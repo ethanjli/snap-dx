@@ -25,10 +25,7 @@ class OctopiGUI(QMainWindow):
 		super().__init__(*args, **kwargs)
 
 		# load objects
-		if SIMULATION:
-			self.microcontroller = microcontroller.Microcontroller_Simulation()
-		else:
-			self.microcontroller = microcontroller.Microcontroller()
+		self.microcontroller = microcontroller.Microcontroller()
 		self.navigationController = core.NavigationController(self.microcontroller)
 		self.logger = core.Logger()
 
@@ -51,8 +48,6 @@ class OctopiGUI(QMainWindow):
 		self.setCentralWidget(self.centralWidget)
 
 		# make connections
-		self.navigationController.xPos.connect(self.navigationWidget.label_Xpos.setNum)
-		self.navigationController.yPos.connect(self.navigationWidget.label_Ypos.setNum)
 		self.navigationController.zPos.connect(self.navigationWidget.label_Zpos.setNum)
 
 		self.controlPanel.signal_logging_onoff.connect(self.navigationController.logging_onoff)

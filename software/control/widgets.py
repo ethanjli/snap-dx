@@ -20,69 +20,6 @@ class NavigationWidget(QFrame):
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
 
     def add_components(self):
-        self.label_Xpos = QLabel()
-        self.label_Xpos.setNum(0)
-        self.label_Xpos.setFrameStyle(QFrame.Panel | QFrame.Sunken)
-        self.entry_dX = QDoubleSpinBox()
-        self.entry_dX.setMinimum(0) 
-        self.entry_dX.setMaximum(80) 
-        self.entry_dX.setSingleStep(1)
-        self.entry_dX.setValue(0)
-        self.entry_vX = QDoubleSpinBox()
-        self.entry_vX.setMinimum(0) 
-        self.entry_vX.setMaximum(100) 
-        self.entry_vX.setSingleStep(1)
-        self.entry_vX.setValue(5)
-        self.entry_aX = QDoubleSpinBox()
-        self.entry_aX.setMinimum(0) 
-        self.entry_aX.setMaximum(500) 
-        self.entry_aX.setSingleStep(1)
-        self.entry_aX.setValue(20)
-        self.combo_ustepX = QComboBox()
-        self.combo_ustepX.addItem('1')
-        self.combo_ustepX.addItem('2')
-        self.combo_ustepX.addItem('4')
-        self.combo_ustepX.addItem('8')
-        self.combo_ustepX.addItem('16')
-        self.combo_ustepX.addItem('32')
-        self.combo_ustepX.addItem('64')
-        self.btn_moveX_forward = QPushButton('Forward')
-        self.btn_moveX_forward.setDefault(False)
-        self.btn_moveX_backward = QPushButton('Backward')
-        self.btn_moveX_backward.setDefault(False)
-        self.btn_cycleX = QPushButton('Cycle')
-        self.btn_cycleX.setDefault(False)
-        
-        self.label_Ypos = QLabel()
-        self.label_Ypos.setNum(0)
-        self.label_Ypos.setFrameStyle(QFrame.Panel | QFrame.Sunken)
-        self.entry_dY = QDoubleSpinBox()
-        self.entry_dY.setMinimum(0)
-        self.entry_dY.setMaximum(80)
-        self.entry_dY.setSingleStep(1)
-        self.entry_dY.setValue(0)
-        self.entry_vY = QDoubleSpinBox()
-        self.entry_vY.setMinimum(0) 
-        self.entry_vY.setMaximum(100) 
-        self.entry_vY.setSingleStep(1)
-        self.entry_vY.setValue(5)
-        self.entry_aY = QDoubleSpinBox()
-        self.entry_aY.setMinimum(0) 
-        self.entry_aY.setMaximum(500) 
-        self.entry_aY.setSingleStep(1)
-        self.entry_aY.setValue(20)
-        self.combo_ustepY = QComboBox()
-        self.combo_ustepY.addItem('1')
-        self.combo_ustepY.addItem('2')
-        self.combo_ustepY.addItem('4')
-        self.combo_ustepY.addItem('8')
-        self.combo_ustepY.addItem('16')
-        self.combo_ustepY.addItem('32')
-        self.combo_ustepY.addItem('64')
-        self.btn_moveY_forward = QPushButton('Forward')
-        self.btn_moveY_forward.setDefault(False)
-        self.btn_moveY_backward = QPushButton('Backward')
-        self.btn_moveY_backward.setDefault(False)
 
         self.label_Zpos = QLabel()
         self.label_Zpos.setNum(0)
@@ -133,7 +70,6 @@ class NavigationWidget(QFrame):
         self.btn_heater2_update = QPushButton('Update')
         self.btn_heater2_update.setDefault(False)
 
-
         self.entry_stopwatch = QDoubleSpinBox()
         self.entry_stopwatch.setMinimum(0) 
         self.entry_stopwatch.setMaximum(3600) 
@@ -145,34 +81,6 @@ class NavigationWidget(QFrame):
         self.btn_stopwatch = QPushButton('Count Down')
         self.btn_stopwatch.setDefault(False)
         
-        grid_line0 = QGridLayout()
-        grid_line0.addWidget(QLabel('X (mm)'), 0,0)
-        grid_line0.addWidget(self.label_Xpos, 0,1)
-        grid_line0.addWidget(QLabel('d (mm)'), 0,2)
-        grid_line0.addWidget(self.entry_dX, 0,3)
-        grid_line0.addWidget(QLabel('v (mm/s)'), 0,4)
-        grid_line0.addWidget(self.entry_vX, 0,5)
-        grid_line0.addWidget(QLabel('a (mm/s/s)'), 0,6)
-        grid_line0.addWidget(self.entry_aX, 0,7)
-        grid_line0.addWidget(QLabel('ustepping'), 0,8)
-        grid_line0.addWidget(self.combo_ustepX, 0,9)
-        grid_line0.addWidget(self.btn_moveX_forward, 0,10)
-        grid_line0.addWidget(self.btn_moveX_backward, 0,11)
-        grid_line0.addWidget(self.btn_cycleX, 0,12)
-
-        grid_line1 = QGridLayout()
-        grid_line1.addWidget(QLabel('Y (mm)'), 0,0)
-        grid_line1.addWidget(self.label_Ypos, 0,1)
-        grid_line1.addWidget(QLabel('d (mm)'), 0,2)
-        grid_line1.addWidget(self.entry_dY, 0,3)
-        grid_line1.addWidget(QLabel('v (mm/s)'), 0,4)
-        grid_line1.addWidget(self.entry_vY, 0,5)
-        grid_line1.addWidget(QLabel('a (mm/s/s)'), 0,6)
-        grid_line1.addWidget(self.entry_aY, 0,7)
-        grid_line1.addWidget(QLabel('ustepping'), 0,8)
-        grid_line1.addWidget(self.combo_ustepY, 0,9)
-        grid_line1.addWidget(self.btn_moveY_forward, 0,10)
-        grid_line1.addWidget(self.btn_moveY_backward, 0,11)
 
         grid_line2 = QGridLayout()
         grid_line2.addWidget(QLabel('Z (mm)'), 0,0)
@@ -214,39 +122,20 @@ class NavigationWidget(QFrame):
         self.grid.addLayout(grid_line3,3,0)
         self.grid.addLayout(grid_line4,4,0)
         self.setLayout(self.grid)
-
-        self.btn_moveX_forward.clicked.connect(self.move_x_forward)
-        self.btn_moveX_backward.clicked.connect(self.move_x_backward)
-        self.btn_cycleX.clicked.connect(self.cycle_x)
-
-        self.btn_moveY_forward.clicked.connect(self.move_y_forward)
-        self.btn_moveY_backward.clicked.connect(self.move_y_backward)
         
         self.btn_moveZ_forward.clicked.connect(self.move_z_forward)
         self.btn_moveZ_backward.clicked.connect(self.move_z_backward)
-        self.btn_cycleZ.clicked.connect(self.cycle_z)
 
         self.btn_heater1_update.clicked.connect(self.set_heater1_power)
         self.btn_heater2_update.clicked.connect(self.set_heater2_power)
 
         self.btn_stopwatch.clicked.connect(self.start_countdown_timer)
         
-    def move_x_forward(self):
-        self.navigationController.move_x(self.entry_dX.value(),self.entry_vX.value(),self.entry_aX.value(),int(self.combo_ustepX.currentText()))
-    def move_x_backward(self):
-        self.navigationController.move_x(-self.entry_dX.value(),self.entry_vX.value(),self.entry_aX.value(),int(self.combo_ustepX.currentText()))
-    def move_y_forward(self):
-        self.navigationController.move_y(self.entry_dY.value(),self.entry_vY.value(),self.entry_aY.value(),int(self.combo_ustepY.currentText()))
-    def move_y_backward(self):
-        self.navigationController.move_y(-self.entry_dY.value(),self.entry_vY.value(),self.entry_aY.value(),int(self.combo_ustepY.currentText()))
+
     def move_z_forward(self):
         self.navigationController.move_z(self.entry_dZ.value(),self.entry_vZ.value(),self.entry_aZ.value(),int(self.combo_ustepZ.currentText()))
     def move_z_backward(self):
         self.navigationController.move_z(-self.entry_dZ.value(),self.entry_vZ.value(),self.entry_aZ.value(),int(self.combo_ustepZ.currentText()))
-    def cycle_x(self):
-        self.navigationController.cycle_x(self.entry_dX.value(),self.entry_vX.value(),self.entry_aX.value(),int(self.combo_ustepX.currentText()))
-    def cycle_z(self):
-        self.navigationController.cycle_z(self.entry_dZ.value(),self.entry_vZ.value(),self.entry_aZ.value(),int(self.combo_ustepZ.currentText()))
     def set_heater1_power(self):
         self.navigationController.set_heater1_power(self.entry_heater1.value())
     def set_heater2_power(self):

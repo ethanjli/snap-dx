@@ -1,14 +1,60 @@
 #include <TMCStepper.h>
 #include <TMCStepper_UTILITY.h>
 #include <AccelStepper.h>
+#include <DueTimer.h>
 
 
+///////////////////////////////////////////////////////////
+/////////////Serial commands//////////////////////////////
+//////////////////////////////////////////////////////////
+// byte[0]: what is controlled: 2 z, 0 heater 1, 1 heater 2
 
-// byte[0]: what is controlled: 2 z, 
-// byte[1]: what direction: 1 forward, 0 backward
-// byte[2]: how many micro steps - upper 8 bits
-// byte[3]: how many micro steps - lower 8 bits
+// for motor (byte[0]=2)
+  // byte[1]: what direction: 1 forward, 0 backward
+  // byte[2]: how many micro steps - upper 8 bits
+  // byte[3]: how many micro steps - lower 8 bits
 
+// for heaters (byte[0]=0|1)
+  // byte[1]: PWM power 
+
+
+  
+///////////////////////////////////////////////////////////
+/////////////Init variables//////////////////////////////
+//////////////////////////////////////////////////////////
+
+
+// heater
+static const int heater_1_pwm = 11;
+static const int heater_2_pwm = 12;
+
+// stepper
+static const int UART_CS_S0 = 46;
+static const int UART_CS_S1 = 47;
+#define STEPPER_SERIAL Serial3
+static const uint8_t Z_driver_ADDRESS = 0b00;
+static const float R_SENSE = 0.11f;
+TMC2209Stepper Z_driver(&STEPPER_SERIAL, R_SENSE, Z_driver_ADDRESS);
+static const int Z_dir = 23;
+static const int Z_step = 25;
+static const int Z_N_microstepping = 2;
+static const long steps_per_mm_Z = 82.02*Z_N_microstepping; 
+constexpr float MAX_VELOCITY_Z_mm = 18.29; 
+constexpr float MAX_ACCELERATION_Z_mm = 100;
+AccelStepper stepper_Z = AccelStepper(AccelStepper::DRIVER, Z_step, Z_dir);
+long Z_commanded_target_position = 0;
+bool Z_commanded_movement_in_progress = false;
+static const float VELOCITY_MAX = 100; // mm/s
+static const float ACCELERATION_MAX = 500; // mm/s/s
+static const int FULLSTEPS_PER_MM = 40;
+
+// limit switches for Z axis
+const byte switch_top=32; 
+const byte switch_bottom=30; 
+volatile bool flag_disable_motorUp = false; 
+volatile bool flag_disable_motorDown = false;
+
+// Serial connection
 static const int CMD_LENGTH = 9;
 static const bool USE_SERIAL_MONITOR = false; // for debug
 static const int MSG_LENGTH = 50*10;
@@ -27,47 +73,11 @@ uint16_t ch3;
 volatile uint32_t timestamp = 0; // in number of TIMER_PERIOD_us
 # define LOGGING_UNDERSAMPLING  1
 volatile int counter_log_data = 0;
-
-// heater
-static const int heater_1_pwm = 11;
-static const int heater_2_pwm = 12;
-
-// stepper
-static const int UART_CS_S0 = 46;
-static const int UART_CS_S1 = 47;
-#define STEPPER_SERIAL Serial3
-static const uint8_t X_driver_ADDRESS = 0b00;
-static const float R_SENSE = 0.11f;
-//TMC2209Stepper X_driver(&STEPPER_SERIAL, R_SENSE, X_driver_ADDRESS);
-//TMC2209Stepper Y_driver(&STEPPER_SERIAL, R_SENSE, X_driver_ADDRESS);
-TMC2209Stepper Z_driver(&STEPPER_SERIAL, R_SENSE, X_driver_ADDRESS);
-
-static const int Z_dir = 23;
-static const int Z_step = 25;
-static const int Z_N_microstepping = 2;
-static const long steps_per_mm_Z = 82.02*Z_N_microstepping; 
-constexpr float MAX_VELOCITY_Z_mm = 18.29; 
-constexpr float MAX_ACCELERATION_Z_mm = 100;
-
-AccelStepper stepper_Z = AccelStepper(AccelStepper::DRIVER, Z_step, Z_dir);
-
-long Z_commanded_target_position = 0;
-bool Z_commanded_movement_in_progress = false;
-
-#include <DueTimer.h>
 static const float TIMER_PERIOD_us = 5000; // in us
 
-static const float VELOCITY_MAX = 100; // mm/s
-static const float ACCELERATION_MAX = 500; // mm/s/s
-static const int FULLSTEPS_PER_MM = 40;
-
-// limit switches for Z axis
-const byte switch_top=32; 
-const byte switch_bottom=30; 
-volatile bool flag_disable_motorUp = false; 
-volatile bool flag_disable_motorDown = false;
-
-
+///////////////////////////////////////////////////////////
+//////////////////////setup //////////////////////////////
+//////////////////////////////////////////////////////////
 
 void setup() {
 
@@ -76,24 +86,22 @@ void setup() {
   while(!SerialUSB);            // Wait until connection is established
   buffer_rx_ptr = 0;
 
-  pinMode(13, OUTPUT);
+  pinMode(13, OUTPUT); //Mel     not sure what that one is for... 
   digitalWrite(13,LOW);
 
 
-  pinMode(Z_dir, OUTPUT);
-  pinMode(Z_step, OUTPUT);
-
-  pinMode(UART_CS_S0, OUTPUT);
-  pinMode(UART_CS_S1, OUTPUT);
-
+  // initialize limit switches
   pinMode(switch_top,INPUT_PULLUP); 
   pinMode(switch_bottom,INPUT_PULLUP); 
   attachInterrupt(digitalPinToInterrupt(switch_top),interrupt_motorUp,RISING); 
   attachInterrupt(digitalPinToInterrupt(switch_bottom),interrupt_motorDown,RISING); 
 
-  // initialize stepper driver
+  // initialize stepper
+  pinMode(Z_dir, OUTPUT);
+  pinMode(Z_step, OUTPUT);
+  pinMode(UART_CS_S0, OUTPUT);
+  pinMode(UART_CS_S1, OUTPUT);
   STEPPER_SERIAL.begin(115200);
-
   digitalWrite(UART_CS_S0, LOW);
   digitalWrite(UART_CS_S1, HIGH);
   while(!STEPPER_SERIAL);
@@ -118,6 +126,10 @@ void setup() {
   Timer3.start(TIMER_PERIOD_us);
   
 }
+
+///////////////////////////////////////////////////////////
+//////////////////////MAIN loop //////////////////////////
+//////////////////////////////////////////////////////////
 
 void loop() {
 
@@ -151,10 +163,10 @@ void loop() {
       }      
 
 
-      if(buffer_rx[0]==7)
-        analogWrite(heater_1_pwm,buffer_rx[1]);
-      if(buffer_rx[0]==8)
-        analogWrite(heater_2_pwm,buffer_rx[1]);
+      if(buffer_rx[0]==0)
+        digitalWrite(heater_1_pwm,buffer_rx[1]>0);
+      if(buffer_rx[0]==1)
+        digitalWrite(heater_2_pwm,buffer_rx[1]>0);
     }
   }
 

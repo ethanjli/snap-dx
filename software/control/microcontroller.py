@@ -35,72 +35,6 @@ class Microcontroller():
     def close(self):
         self.serial.close()
 
-    def toggle_LED(self,state):
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 3
-        cmd[1] = state
-        self.serial.write(cmd)
-    
-    def toggle_laser(self,state):
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 4
-        cmd[1] = state
-        self.serial.write(cmd)
-
-    def move_x(self,delta,v,a,ustepping):
-        direction = int((np.sign(delta)+1)/2)
-        delta_abs = abs(delta)
-        if delta_abs > 65535:
-            delta_abs = 65535
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 0
-        cmd[1] = direction
-        cmd[2] = int(delta_abs) >> 8
-        cmd[3] = int(delta_abs) & 0xff
-        cmd[4] = ustepping
-        cmd[5] = int(v) >> 8
-        cmd[6] = int(v) & 0xff
-        cmd[7] = int(a) >> 8
-        cmd[8] = int(a) & 0xff
-        self.serial.write(cmd)
-        time.sleep(WaitTime.BASE + WaitTime.X*abs(delta))
-
-    def cycle_x(self,delta,v,a,ustepping):
-        direction = int((np.sign(delta)+1)/2)
-        delta_abs = abs(delta)
-        if delta_abs > 65535:
-            delta_abs = 65535
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 4
-        cmd[1] = direction
-        cmd[2] = int(delta_abs) >> 8
-        cmd[3] = int(delta_abs) & 0xff
-        cmd[4] = ustepping
-        cmd[5] = int(v) >> 8
-        cmd[6] = int(v) & 0xff
-        cmd[7] = int(a) >> 8
-        cmd[8] = int(a) & 0xff
-        self.serial.write(cmd)
-        time.sleep(WaitTime.BASE + WaitTime.X*abs(delta))
-
-    def move_y(self,delta,v,a,ustepping):
-        direction = int((np.sign(delta)+1)/2)
-        delta_abs = abs(delta*Motion.STEPS_PER_MM_XY)
-        if delta_abs > 65535:
-            delta_abs = 65535
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 1
-        cmd[1] = direction
-        cmd[2] = int(delta_abs) >> 8
-        cmd[3] = int(delta_abs) & 0xff
-        cmd[4] = ustepping
-        cmd[5] = int(v) >> 8
-        cmd[6] = int(v) & 0xff
-        cmd[7] = int(a) >> 8
-        cmd[8] = int(a) & 0xff
-        self.serial.write(cmd)
-        time.sleep(WaitTime.BASE + WaitTime.Y*abs(delta))
-
     def move_z(self,delta,v,a,ustepping):
         direction = int((np.sign(delta)+1)/2)
         delta_abs = abs(delta*Motion.STEPS_PER_MM_Z)
@@ -119,35 +53,16 @@ class Microcontroller():
         self.serial.write(cmd)
         time.sleep(WaitTime.BASE + WaitTime.Z*abs(delta))
 
-    def cycle_z(self,delta,v,a,ustepping):
-        direction = int((np.sign(delta)+1)/2)
-        delta_abs = abs(delta)
-        if delta_abs > 65535:
-            delta_abs = 65535
-        cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 6
-        cmd[1] = direction
-        cmd[2] = int(delta_abs) >> 8
-        cmd[3] = int(delta_abs) & 0xff
-        cmd[4] = ustepping
-        cmd[5] = int(v) >> 8
-        cmd[6] = int(v) & 0xff
-        cmd[7] = int(a) >> 8
-        cmd[8] = int(a) & 0xff
-        self.serial.write(cmd)
-        time.sleep(WaitTime.BASE + WaitTime.X*abs(delta))
-        print('cycle z')
-
     def set_heater1_power(self,power):
         cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 7
+        cmd[0] = 0
         cmd[1] = int(255*power)
         self.serial.write(cmd)
         print('update heater 1 power to ' + str(power))
 
     def set_heater2_power(self,power):
         cmd = bytearray(self.tx_buffer_length)
-        cmd[0] = 8
+        cmd[0] = 1
         cmd[1] = int(255*power)
         self.serial.write(cmd)
         print('update heater 2 power to ' + str(power))
@@ -205,26 +120,9 @@ class Microcontroller_Simulation():
     def close(self):
         pass
 
-    def toggle_LED(self,state):
-        pass
-    
-    def toggle_laser(self,state):
-        pass
-
-    def move_x(self,delta,v,a,ustepping):
-        pass
-
-    def cycle_x(self,delta,v,a,ustepping):
-        pass
-
-    def move_y(self,delta,v,a,ustepping):
-        pass
-
     def move_z(self,delta,v,a,ustepping):
         pass
 
-    def cycle_z(self,delta,v,a,ustepping):
-        pass
 
     def send_command(self,command):
         pass
