@@ -92,6 +92,14 @@ static const float VELOCITY_MAX = 100; // mm/s
 static const float ACCELERATION_MAX = 500; // mm/s/s
 static const int FULLSTEPS_PER_MM = 40;
 
+// limit switches for Z axis
+const byte switch_top=30; //Mel
+const byte switch_bottom=32; //Mel
+volatile bool flag_disable_motorUp = false; //Mel
+volatile bool flag_disable_motorDown = false;//Mel
+
+
+
 void setup() {
 
   // Initialize Native USB port
@@ -113,6 +121,11 @@ void setup() {
 
   pinMode(UART_CS_S0, OUTPUT);
   pinMode(UART_CS_S1, OUTPUT);
+
+  pinMode(switch_top,INPUT_PULLUP); //Mel
+  pinMode(switch_bottom,INPUT_PULLUP); //Mel
+  attachInterrupt(digitalPinToInterrupt(switch_top),interrupt_motorUp,RISING); //Mel
+  attachInterrupt(digitalPinToInterrupt(switch_bottom),interrupt_motorDown,RISING); //Mel
 
   // initialize stepper driver
   STEPPER_SERIAL.begin(115200);
@@ -327,8 +340,17 @@ void loop() {
   if(Z_commanded_movement_in_progress && stepper_Z.currentPosition()==Z_commanded_target_position)
     Z_commanded_movement_in_progress = false;
   // move motors
-  if(Z_commanded_movement_in_progress)
-    stepper_Z.run();
+  if(Z_commanded_movement_in_progress){
+    if ((flag_disable_motorDown==false)&&(stepper_Z.distanceToGo()>0)){ //Mel
+      stepper_Z.run();
+      flag_disable_motorUp=false;
+    }
+    if ((flag_disable_motorUp==false)&&(stepper_Z.distanceToGo()<0)) { //Mel
+      stepper_Z.run();
+      flag_disable_motorUp=false;
+    }
+  }
+
 
   if (flag_read_sensor)
   {
@@ -393,6 +415,14 @@ void timer_interruptHandler()
   }
 }
 
+// switch limit interrupt for motor - Mel
+void interrupt_motorUp(){
+    flag_disable_motorUp=true;
+}
+void interrupt_motorDown(){
+
+    flag_disable_motorDown=true;
+}
 // utils
 long signed2NBytesUnsigned(long signedLong,int N)
 {
