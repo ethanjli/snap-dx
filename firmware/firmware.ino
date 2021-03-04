@@ -7,15 +7,18 @@
 ///////////////////////////////////////////////////////////
 /////////////Serial commands//////////////////////////////
 //////////////////////////////////////////////////////////
-// byte[0]: what is controlled: 2 z, 0 heater 1, 1 heater 2
+// byte[0]: what is controlled: 2 z, 0 heater 1, 1 heater 2, 3, tickler
 
-// for motor (byte[0]=2)
+// for motor (byte[0]==2)
 // byte[1]: what direction: 1 forward, 0 backward
 // byte[2]: how many micro steps - upper 8 bits
 // byte[3]: how many micro steps - lower 8 bits
 
-// for heaters (byte[0]=0|1)
-// byte[1]: PWM power
+// for heaters (byte[0]==0|1)
+// byte[1]: on if>0; off if ==0
+
+// for tickler (byte[0]==3)
+// byte[1]: on/off
 
 
 
@@ -50,6 +53,10 @@ unsigned long heater_2_onTime = 0; // time since heater switched ON
 unsigned long heater_2_offTime = 0; // time since heater switched OFF
 unsigned long heater_2_interval_on = 1000UL * 5 ; //last number is number of seconds per interval
 unsigned long heater_2_interval_off = 1000UL * 5; //last number is number of seconds per interval
+
+// tickler
+static const int tickler = 44; //tickler pin
+bool tickler_on = false; // is tickler on? current status
 
 
 // stepper
@@ -91,6 +98,10 @@ volatile int buffer_tx_ptr;
 static const int N_BYTES_POS = 3;
 
 // sensor and data logging
+static const int temp_ch1 = A4; // ref pin
+static const int temp_ch2 = A8; // thermistor 1
+static const int temp_ch3 = A6; // thermistor 2
+
 volatile bool flag_log_data = false;
 volatile bool flag_read_sensor = false;
 uint16_t ch1;
@@ -159,14 +170,19 @@ void setup() {
   digitalWrite(heater_2, HIGH); //HIGH means heater OFF
 
 
-  ch1 = analogRead(A4);
-  ch2 = analogRead(A8);
-  ch3 = analogRead(A6);
+  // initialise temperature measurement
+  ch1 = analogRead(temp_ch1);
+  ch2 = analogRead(temp_ch2);
+  ch3 = analogRead(temp_ch3);
   temp_1 = get_temp(ch1, ch3);
   temp_1_t0 = millis();
 
   temp_2 = get_temp(ch1, ch2);
   temp_2_t0 = millis();
+
+  // initialize tickler
+  pinMode(tickler, OUTPUT);
+  digitalWrite(tickler, HIGH); //HIGH means heater OFF
 
 }
 
@@ -184,7 +200,7 @@ void loop() {
     {
       buffer_rx_ptr = 0;
 
-      if (buffer_rx[0] == 2)
+      if (buffer_rx[0] == 2) // translation motor
       {
         long relative_position = long(buffer_rx[1] * 2 - 1) * (long(buffer_rx[2]) * 256 + long(buffer_rx[3]));
         int n_microstepping = buffer_rx[4];
@@ -206,8 +222,20 @@ void loop() {
         Z_commanded_movement_in_progress = true;
       }
 
+      if (buffer_rx[0] == 3) //tickler
+      {
+        if (buffer_rx[1] > 0) { //activate heater1
+          digitalWrite(tickler, LOW);//stwitch tickler ON
+          tickler_on = truel
+        }
+        else {//deactivate heater
+          digitalWrite(tickler, HIGH);//stwitch tickler OFF
+          tickler_off = false;
+        }
+      }
 
-      if (buffer_rx[0] == 0)
+
+      if (buffer_rx[0] == 0) //heater 1
       {
         if (buffer_rx[1] > 0) { //activate heater1
           if (heater_1_onTime == 0) { //if the heater was off, start it
@@ -225,7 +253,7 @@ void loop() {
         }
       }
 
-      if (buffer_rx[0] == 1)
+      if (buffer_rx[0] == 1) //heater 2
       {
         if (buffer_rx[1] > 0) { //activate heater1
           if (heater_2_onTime == 0) { //if the heater was off, start it
@@ -329,9 +357,9 @@ void loop() {
 
   if (flag_read_sensor)
   {
-    ch1 = analogRead(A4);
-    ch2 = analogRead(A8);
-    ch3 = analogRead(A6);
+    ch1 = analogRead(temp_ch1);
+    ch2 = analogRead(temp_ch2);
+    ch3 = analogRead(temp_ch3);
     flag_read_sensor = false;
   }
 
