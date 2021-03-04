@@ -28,28 +28,28 @@
 //static const int heater_1_pwm = 11;
 static const int heater_1 = 40;
 float temp_1 = 0; // temp heater 11
-unsigned long temp_1_interval = 1000UL; // temperature update every second
+unsigned long temp_1_interval = 500UL; // temperature update every second
 unsigned long temp_1_t0 = 0;
-float temp_1_setpoint = 65; //XX C temperature setpoint
+float temp_1_setpoint = 95; //XX C temperature setpoint
 bool heater_1_act = false; // is the heater activated for temperature regulation
 unsigned long heater_1_onTime = 0; // time since heater switched ON
 unsigned long heater_1_offTime = 0; // time since heater switched OFF
-unsigned long heater_1_interval_on = 1000UL * 30 ; //last number is number of seconds per interval
-unsigned long heater_1_interval_off = 1000UL * 10; //last number is number of seconds per interval
+unsigned long heater_1_interval_on = 1000UL * 10 ; //last number is number of seconds per interval
+unsigned long heater_1_interval_off = 1000UL * 20; //last number is number of seconds per interval
 
 
 // heater 2
 //static const int heater_2 = 12;
-static const int heater_1 = 38;
+static const int heater_2 = 38;
 float temp_2 = 0; // temp heater 11
 unsigned long temp_2_interval = 1000UL; // temperature update every second
 unsigned long temp_2_t0 = 0;
-float temp_2_setpoint = 95; //XX C temperature setpoint
+float temp_2_setpoint = 60; //XX C temperature setpoint
 bool heater_2_act = false; // is the heater activated for temperature regulation
 unsigned long heater_2_onTime = 0; // time since heater switched ON
 unsigned long heater_2_offTime = 0; // time since heater switched OFF
-unsigned long heater_2_interval_on = 1000UL * 30 ; //last number is number of seconds per interval
-unsigned long heater_2_interval_off = 1000UL * 20; //last number is number of seconds per interval
+unsigned long heater_2_interval_on = 1000UL * 5 ; //last number is number of seconds per interval
+unsigned long heater_2_interval_off = 1000UL * 5; //last number is number of seconds per interval
 
 
 // stepper
@@ -153,15 +153,17 @@ void setup() {
   //  initialize heater
   pinMode(heater_1, OUTPUT);
   digitalWrite(heater_1, HIGH); //HIGH means heater OFF
+  pinMode(heater_2, OUTPUT);
+  digitalWrite(heater_2, HIGH); //HIGH means heater OFF
 
 
   ch1 = analogRead(A4);
   ch2 = analogRead(A8);
   ch3 = analogRead(A6);
-  temp_1 = get_temp(ch1, ch2);
+  temp_1 = get_temp(ch1, ch3);
   temp_1_t0 = millis();
 
-  temp_2 = get_temp(ch1, ch3);
+  temp_2 = get_temp(ch1, ch2);
   temp_2_t0 = millis();
 
 }
@@ -176,7 +178,8 @@ void loop() {
   while (SerialUSB.available()) {
     buffer_rx[buffer_rx_ptr] = SerialUSB.read();
     buffer_rx_ptr = buffer_rx_ptr + 1;
-    if (buffer_rx_ptr == CMD_LENGTH) {
+    if (buffer_rx_ptr == CMD_LENGTH)
+    {
       buffer_rx_ptr = 0;
 
       if (buffer_rx[0] == 2)
@@ -215,15 +218,32 @@ void loop() {
         else {//deactivate heater
           digitalWrite(heater_1, HIGH);
           heater_1_onTime = 0;
-          heater_1_offTime = 1;
+          heater_1_offTime = 0;
           heater_1_act = false;
         }
+      }
 
-        if (buffer_rx[0] == 1)
-          analogWrite(heater_2, buffer_rx[1]);
+      if (buffer_rx[0] == 1)
+      {
+        if (buffer_rx[1] > 0) { //activate heater1
+          if (heater_2_onTime == 0) { //if the heater was off, start it
+            heater_2_act = true;
+            digitalWrite(heater_2, LOW);
+            heater_2_onTime = millis();
+            heater_2_offTime = 0;
+          }
+        }
+        else {//deactivate heater
+          digitalWrite(heater_2, HIGH);
+          heater_2_onTime = 0;
+          heater_2_offTime = 0;
+          heater_2_act = false;
+        }
       }
     }
+
   }
+
 
   if (millis() - temp_1_t0 > temp_1_interval) //measure temperature every temp_1_interval
   {
@@ -258,7 +278,7 @@ void loop() {
 
   }
 
-  
+
   if (heater_2_act == true) {
     if (heater_2_onTime > 0 && millis() - heater_2_onTime > heater_2_interval_on) //if it has been on for too long, switch off
     {
@@ -345,12 +365,12 @@ void loop() {
 
 
 /***************************************************************************************************/
-/********************************************* funcions **********************************************/
+/********************************************* functions **********************************************/
 /***************************************************************************************************/
 
 float get_temp(int daq1, int daq2)
 {
-  float R = 1980;
+  float R = 1977;
   float frac = 0;
   float Rth = 0;
   float T;
