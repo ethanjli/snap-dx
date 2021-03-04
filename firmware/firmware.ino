@@ -73,10 +73,12 @@ static const float ACCELERATION_MAX = 500; // mm/s/s
 static const int FULLSTEPS_PER_MM = 40;
 
 // limit switches for Z axis
-const byte switch_top = 32;
-const byte switch_bottom = 30;
+const byte switch_top = 30;
+const byte switch_bottom = 32;
 volatile bool flag_disable_motorUp = false;
 volatile bool flag_disable_motorDown = false;
+bool switch_top_off = false;
+bool switch_bottom_off = false;
 
 // Serial connection
 static const int CMD_LENGTH = 9;
@@ -309,15 +311,20 @@ void loop() {
     Z_commanded_movement_in_progress = false;
   // move motors
   if (Z_commanded_movement_in_progress) {
-    if ((flag_disable_motorDown == false) && (stepper_Z.distanceToGo() > 0)) { //Mel
-      stepper_Z.run();
-      flag_disable_motorUp = false;
+    switch_top_off = digitalRead(switch_top);
+    switch_bottom_off = digitalRead(switch_bottom);
+    if ((stepper_Z.distanceToGo() > 0) && (!switch_top_off))
+    {
+      stepper_Z.stop();
     }
-    if ((flag_disable_motorUp == false) && (stepper_Z.distanceToGo() < 0)) { //Mel
-      stepper_Z.run();
-      flag_disable_motorDown = false;
+    if ((stepper_Z.distanceToGo() < 0) && (!switch_bottom_off))
+    {
+      stepper_Z.stop();
     }
+    stepper_Z.run();
   }
+
+
 
 
   if (flag_read_sensor)
