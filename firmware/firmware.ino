@@ -28,9 +28,8 @@
 
 
 // heater 1
-//static const int heater_1_pwm = 11;
 static const int heater_1 = 40;
-float temp_1 = 0; // temp heater 11
+float temp_1 = 0; // temp heater 1
 unsigned long temp_1_interval = 500UL; // temperature update every second
 unsigned long temp_1_t0 = 0;
 float temp_1_setpoint = 95; //XX C temperature setpoint
@@ -42,9 +41,8 @@ unsigned long heater_1_interval_off = 1000UL * 20; //last number is number of se
 
 
 // heater 2
-//static const int heater_2 = 12;
-static const int heater_2 = 38;
-float temp_2 = 0; // temp heater 11
+static const int heater_2 = 42;
+float temp_2 = 0; // temp heater 2
 unsigned long temp_2_interval = 1000UL; // temperature update every second
 unsigned long temp_2_t0 = 0;
 float temp_2_setpoint = 60; //XX C temperature setpoint
@@ -58,18 +56,11 @@ unsigned long heater_2_interval_off = 1000UL * 5; //last number is number of sec
 static const int tickler = 44; //tickler pin
 bool tickler_on = false; // is tickler on? current status
 
-
-// stepper
-static const int UART_CS_S0 = 46;
-static const int UART_CS_S1 = 47;
-#define STEPPER_SERIAL Serial3
-static const uint8_t Z_driver_ADDRESS = 0b00;
-static const float R_SENSE = 0.11f;
-TMC2209Stepper Z_driver(&STEPPER_SERIAL, R_SENSE, Z_driver_ADDRESS);
-static const int Z_dir = 23;
-static const int Z_step = 25;
-static const int Z_N_microstepping = 2;
-static const long steps_per_mm_Z = 82.02 * Z_N_microstepping;
+// Stepper motor
+static const int Z_step = 33; // test
+static const int Z_dir = 35; // test
+static const int Z_en = 37; // test
+static const long steps_per_mm_Z = 82.02;
 constexpr float MAX_VELOCITY_Z_mm = 18.29;
 constexpr float MAX_ACCELERATION_Z_mm = 100;
 AccelStepper stepper_Z = AccelStepper(AccelStepper::DRIVER, Z_step, Z_dir);
@@ -98,9 +89,9 @@ volatile int buffer_tx_ptr;
 static const int N_BYTES_POS = 3;
 
 // sensor and data logging
-static const int temp_ch1 = A4; // ref pin
-static const int temp_ch2 = A8; // thermistor 1
-static const int temp_ch3 = A6; // thermistor 2
+static const int temp_ch1 = A0; // ref pin
+static const int temp_ch2 = A1; // thermistor 1
+static const int temp_ch3 = A3; // thermistor 2
 
 volatile bool flag_log_data = false;
 volatile bool flag_read_sensor = false;
@@ -136,20 +127,8 @@ void setup() {
   // initialize stepper
   pinMode(Z_dir, OUTPUT);
   pinMode(Z_step, OUTPUT);
-  pinMode(UART_CS_S0, OUTPUT);
-  pinMode(UART_CS_S1, OUTPUT);
-  STEPPER_SERIAL.begin(115200);
-  digitalWrite(UART_CS_S0, LOW);
-  digitalWrite(UART_CS_S1, HIGH);
-  while (!STEPPER_SERIAL);
-  Z_driver.begin();
-  Z_driver.I_scale_analog(false);
-  Z_driver.rms_current(400, 0.2); //I_run and holdMultiplier
-  Z_driver.microsteps(Z_N_microstepping);
-  Z_driver.pwm_autoscale(true);
-  Z_driver.TPOWERDOWN(2);
-  Z_driver.en_spreadCycle(false);
-  Z_driver.toff(4);
+  pinMode(Z_en, OUTPUT);
+  digitalWrite(Z_en, HIGH);
   stepper_Z.setPinsInverted(false, false, true);
   stepper_Z.setMaxSpeed(MAX_VELOCITY_Z_mm * steps_per_mm_Z);
   stepper_Z.setAcceleration(MAX_ACCELERATION_Z_mm * steps_per_mm_Z);
@@ -157,6 +136,7 @@ void setup() {
 
   analogReadResolution(12);
   delayMicroseconds(500000);
+
 
   // start the timer
   Timer3.attachInterrupt(timer_interruptHandler);
@@ -203,34 +183,36 @@ void loop() {
       if (buffer_rx[0] == 2) // translation motor
       {
         long relative_position = long(buffer_rx[1] * 2 - 1) * (long(buffer_rx[2]) * 256 + long(buffer_rx[3]));
-        int n_microstepping = buffer_rx[4];
-        float steps_per_mm = 100 * n_microstepping;
+        //        int n_microstepping = buffer_rx[4];
+        //        float steps_per_mm = 100 * n_microstepping;
+        float steps_per_mm = 100;
         float velocity = VELOCITY_MAX * (float(long(buffer_rx[5]) * 256 + long(buffer_rx[6])) / 65535);
         float acceleration = ACCELERATION_MAX * (float(long(buffer_rx[7]) * 256 + long(buffer_rx[8])) / 65535);
         //    select_driver(3);
-        while (!STEPPER_SERIAL);
-        Z_driver.begin();
-        if (n_microstepping == 1)
-          Z_driver.microsteps(0);
-        else
-          Z_driver.microsteps(n_microstepping);
+        //        while (!STEPPER_SERIAL);
+        //        Z_driver.begin();//
+        //        if (n_microstepping == 1)
+        //          Z_driver.microsteps(0);
+        //        else
+        //          Z_driver.microsteps(n_microstepping);
         stepper_Z.setMaxSpeed(velocity * steps_per_mm);
         stepper_Z.setAcceleration(acceleration * steps_per_mm);
 
         Z_commanded_target_position = (stepper_Z.currentPosition() + relative_position);
         stepper_Z.moveTo(Z_commanded_target_position);
         Z_commanded_movement_in_progress = true;
+        digitalWrite(Z_en, LOW);
       }
 
       if (buffer_rx[0] == 3) //tickler
       {
-        if (buffer_rx[1] > 0) { //activate heater1
+        if (buffer_rx[1] > 0) { //activate tickler
           digitalWrite(tickler, LOW);//stwitch tickler ON
-          tickler_on = truel
+          tickler_on = true;
         }
         else {//deactivate heater
           digitalWrite(tickler, HIGH);//stwitch tickler OFF
-          tickler_off = false;
+          tickler_on = false;
         }
       }
 
@@ -336,7 +318,10 @@ void loop() {
 
 
   if (Z_commanded_movement_in_progress && stepper_Z.currentPosition() == Z_commanded_target_position)
+  {
     Z_commanded_movement_in_progress = false;
+    digitalWrite(Z_en, HIGH);
+  }
   // move motors
   if (Z_commanded_movement_in_progress) {
     switch_top_off = digitalRead(switch_top);
