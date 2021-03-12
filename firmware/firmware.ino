@@ -28,7 +28,7 @@
 
 
 // heater 1
-static const int heater_1 = 40;
+static const int heater_1 = 44;
 float temp_1 = 0; // temp heater 1
 unsigned long temp_1_interval = 500UL; // temperature update every second
 unsigned long temp_1_t0 = 0;
@@ -53,14 +53,20 @@ unsigned long heater_2_interval_on = 1000UL * 5 ; //last number is number of sec
 unsigned long heater_2_interval_off = 1000UL * 5; //last number is number of seconds per interval
 
 // tickler
-static const int tickler = 44; //tickler pin
+static const int tickler = 40; //tickler pin
 bool tickler_on = false; // is tickler on? current status
 
+// solenoid
+static const int solenoid = 38; //solenoid pin
+bool solenoid_on = false; // is solenoid on? current status
+
 // Stepper motor
-static const int Z_step = 33; // test
-static const int Z_dir = 35; // test
-static const int Z_en = 37; // test
-static const long steps_per_mm_Z = 82.02;
+static const int Z_step = 35; // test
+static const int Z_dir = 33; // test
+static const int Z_en = 31; // test
+static const int N_microsteps=16;
+static const long steps_per_mm_Z = 500*N_microsteps;
+static const int FULLSTEPS_PER_MM = 40;
 constexpr float MAX_VELOCITY_Z_mm = 18.29;
 constexpr float MAX_ACCELERATION_Z_mm = 100;
 AccelStepper stepper_Z = AccelStepper(AccelStepper::DRIVER, Z_step, Z_dir);
@@ -68,11 +74,11 @@ long Z_commanded_target_position = 0;
 bool Z_commanded_movement_in_progress = false;
 static const float VELOCITY_MAX = 100; // mm/s
 static const float ACCELERATION_MAX = 500; // mm/s/s
-static const int FULLSTEPS_PER_MM = 40;
+
 
 // limit switches for Z axis
-const byte switch_top = 30;
-const byte switch_bottom = 32;
+const byte switch_top = 22;
+const byte switch_bottom = 23;
 volatile bool flag_disable_motorUp = false;
 volatile bool flag_disable_motorDown = false;
 bool switch_top_off = false;
@@ -91,7 +97,7 @@ static const int N_BYTES_POS = 3;
 // sensor and data logging
 static const int temp_ch1 = A0; // ref pin
 static const int temp_ch2 = A1; // thermistor 1
-static const int temp_ch3 = A3; // thermistor 2
+static const int temp_ch3 = A2; // thermistor 2
 
 volatile bool flag_log_data = false;
 volatile bool flag_read_sensor = false;
@@ -183,9 +189,7 @@ void loop() {
       if (buffer_rx[0] == 2) // translation motor
       {
         long relative_position = long(buffer_rx[1] * 2 - 1) * (long(buffer_rx[2]) * 256 + long(buffer_rx[3]));
-        //        int n_microstepping = buffer_rx[4];
-        //        float steps_per_mm = 100 * n_microstepping;
-        float steps_per_mm = 100;
+        float steps_per_mm = steps_per_mm_Z;
         float velocity = VELOCITY_MAX * (float(long(buffer_rx[5]) * 256 + long(buffer_rx[6])) / 65535);
         float acceleration = ACCELERATION_MAX * (float(long(buffer_rx[7]) * 256 + long(buffer_rx[8])) / 65535);
         //    select_driver(3);
