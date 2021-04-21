@@ -38,7 +38,11 @@ class Procedure {
     Step step_ = Step::power_on;
 };
 
-// Global variables are probably not needed
+// Global variables
+
+InstantDx instant_dx;
+Procedure procedure;
+InstantDx::TestResult test_result;
 
 // Main function
 
@@ -48,10 +52,6 @@ void loop() {
     using Step = Procedure::Step;
     using ButtonsState = UserInterface::ButtonsState;
     using TestResult = InstantDx::TestResult;
-
-    InstantDx instant_dx;
-    Procedure procedure;
-    TestResult test_result;
 
     // Each time loop is called, it runs the current step of the procedure.
     // The work done in each step of the procedure is defined in the switch block.
