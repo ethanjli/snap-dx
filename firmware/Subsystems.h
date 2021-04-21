@@ -12,6 +12,7 @@ class UserInterface {
     void report_initialization_failure() {}
     void print_message() {}
     void label_buttons() {}
+    // Do we need debouncing of button reads?
     ButtonsState read_buttons() {}
 
    private:
@@ -37,7 +38,28 @@ class ColorDetector {
 
 class ThermalController {
    public:
+    ThermalController()
+        : heater_1_(44, true),
+          heater_2_(42, true),
+          thermistor_1_(A1, A0),
+          thermistor_2_(A2, A0) {}
     bool setup() {
+        if (!thermistor_1_.setup()) {
+            return false;
+        }
+
+        if (!thermistor_2_.setup()) {
+            return false;
+        }
+
+        if (!heater_1_.setup()) {
+            return false;
+        }
+
+        if (!heater_2_.setup()) {
+            return false;
+        }
+
         // switch on fan
         return true;
     }
@@ -48,8 +70,8 @@ class ThermalController {
     bool temperature_converged(int temperature) {}
 
    private:
-    Heater heater_1_;
-    Heater heater_2_;
+    DigitalOutput heater_1_;
+    DigitalOutput heater_2_;
     Thermistor thermistor_1_;
     Thermistor thermistor_2_;
     TemperatureControlLoop control_loop_;
@@ -58,35 +80,64 @@ class ThermalController {
 
 class MotionController {
    public:
+    MotionController()
+        : stepper_(33, 35, 31), switch_top_(22), switch_bottom_(23) {}
+
     bool setup() {
+        if (!switch_top_.setup()) {
+            return false;
+        }
+
+        if (!switch_bottom_.setup()) {
+            return false;
+        }
+
+        if (!stepper_.setup()) {
+            return false;
+        }
+
         move_to(0);
         // Are there any potential hardware faults to catch, e.g. motor can't
         // move?
         return true;
     }
 
+    // Do we need debouncing of limit switch reads?
     void move_to(uint32_t position) {}
 
    private:
-    StepperMotor motor_;
-    LimitSwitch switch_1_;
-    LimitSwitch switch_2_;
+    StepperMotor stepper_;
+    LimitSwitch switch_top_;
+    LimitSwitch switch_bottom_;
 };
 
 class Mixer {
    public:
-    bool setup() {}
+    Mixer() : tickler_(40, true) {}
+
+    bool setup() {
+        if (!tickler_.setup()) {
+            return false;
+        }
+    }
 
     void start_mixing() {}
     void stop_mixing() {}
 
    private:
-    Tickler tickler_;
+    DigitalOutput tickler_;
 };
 
 class Door {
    public:
+    Door()
+        : solenoid_(38, true /*is the solenoid an active-low output?*/),
+          lock_switch_(0 /*what pin is used for the door's limit switch?*/) {}
     bool setup() {
+        if (!lock_switch_.setup()) {
+            return false;
+        }
+
         if (!is_open()) {
             lock();
             return true;
@@ -102,7 +153,7 @@ class Door {
     bool is_open() {}
 
    private:
-    Solenoid solenoid_;
+    DigitalOutput solenoid_;
     LimitSwitch lock_switch_;
 };
 
