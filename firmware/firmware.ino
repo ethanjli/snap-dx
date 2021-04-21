@@ -31,7 +31,9 @@ class Procedure {
     // Wait for a single button-press, then change the step of the procedure
     // based on which button was pressed
     void go_on_button(InstantDx &instant_dx, Step primary, Step secondary) {
-        switch (instant_dx.await_button()) {  // guaranteed to return primary/secondary
+        switch (
+            instant_dx
+                .await_button()) {  // guaranteed to return primary/secondary
             case UserInterface::ButtonsState::primary:
                 go(primary);
                 return;
@@ -66,15 +68,16 @@ void setup() {}
 // Each time loop is called, it checks the procedure object to determine the
 // current step of the procedure, executes the work defined for that step,
 // and then finishes by setting what should be the current step of the procedure
-// the next time loop is called (this is defined as part of the work for each step).
-// Together, the procedure object and the loop function work as a state machine.
+// the next time loop is called (this is defined as part of the work for each
+// step). Together, the procedure object and the loop function work as a state
+// machine.
 void loop() {
     using Step = Procedure::Step;
     using ButtonsState = UserInterface::ButtonsState;
     using TestResult = InstantDx::TestResult;
 
-    // The work done in each step of the procedure is defined in this switch block.
-    // Each step of the procedure corresponds to one case statement.
+    // The work done in each step of the procedure is defined in this switch
+    // block. Each step of the procedure corresponds to one case statement.
     switch (procedure.step()) {
         case Step::power_on:
             procedure.go(Step::initialize);
@@ -87,8 +90,9 @@ void loop() {
         case Step::standby:
             instant_dx.user_interface.print_message(/*InstantDx - v?.?.?*/);
             instant_dx.user_interface.label_buttons(/*new test, --*/);
-            instant_dx.await_button(ButtonsState::primary); // new test
-            instant_dx.await_temperature(100);  // what should happen when TEMP_!OK?
+            instant_dx.await_button(ButtonsState::primary);  // new test
+            instant_dx.await_temperature(
+                100);  // what should happen when TEMP_!OK?
             procedure.go(Step::load_insert);
             return;
         case Step::load_insert:
@@ -101,18 +105,20 @@ void loop() {
         case Step::load_close:
             instant_dx.user_interface.print_message(/*Close and buckle*/);
             instant_dx.user_interface.label_buttons(/*done, back*/);
-            procedure.go_on_button(instant_dx, Step::load_lock, Step::load_insert);
+            procedure.go_on_button(instant_dx, Step::load_lock,
+                                   Step::load_insert);
             return;
         case Step::load_lock:
             instant_dx.user_interface.print_message(/*Locking door...*/);
-            instant_dx.user_interface.label_buttons(); // remove button labels
+            instant_dx.user_interface.label_buttons();  // remove button labels
             instant_dx.door.lock();
             // Do we need to wait a bit to ensure the door's properly closed?
             if (!instant_dx.door.is_open()) {
                 procedure.go(Step::start);
                 return;
             }
-            instant_dx.user_interface.print_message(/*Error. Door not fully closed.*/);
+            instant_dx.user_interface.print_message(
+                /*Error. Door not fully closed.*/);
             instant_dx.user_interface.label_buttons(/*done, back*/);
             switch (instant_dx.await_button()) {
                 case ButtonsState::primary:
@@ -139,15 +145,15 @@ void loop() {
             instant_dx.user_interface.label_buttons(/*ok, --*/);
             switch (test_result) {
                 case TestResult::detected:
-                    // Flow chart says to print "un-detected" in the detected case!
-                    // I'm pretty sure the flow-chart is wrong...
+                    // Flow chart says to print "un-detected" in the detected
+                    // case! I'm pretty sure the flow-chart is wrong...
                     instant_dx.user_interface.print_message(/*Un-detected*/);
                     instant_dx.await_button(ButtonsState::primary);
                     procedure.go(Step::unload_open);
                     return;
                 case TestResult::not_detected:
-                    // Flow chart says to print "-detected" in the not detected case!
-                    // I'm pretty sure the flow-chart is wrong...
+                    // Flow chart says to print "-detected" in the not detected
+                    // case! I'm pretty sure the flow-chart is wrong...
                     instant_dx.user_interface.print_message(/*Detected*/);
                     instant_dx.await_button(ButtonsState::primary);
                     procedure.go(Step::unload_open);
@@ -155,26 +161,31 @@ void loop() {
                 case TestResult::invalid:
                     instant_dx.user_interface.print_message(/*Invalid test*/);
                     instant_dx.await_button(ButtonsState::primary);
-                    // This implies that we don't unload the sample, clean interior, etc.
-                    // Is this what we want?
+                    // This implies that we don't unload the sample, clean
+                    // interior, etc. Is this what we want?
                     procedure.go(Step::quit);
                     return;
             }
             // What do the TEMP_!OK and TEMP_OK blocks mean in the arrow to 9?
             return;
         case Step::unload_open:
-            // what does "wait (1S)" mean here? why is it only on this door operation?
+            instant_dx.await_timeout(1000);
+            // what does "wait (1S)" mean here? why is it only on this door
+            // operation?
             instant_dx.door.unlock();
             instant_dx.user_interface.print_message(/*Open and unload*/);
-            procedure.go_on_button(instant_dx, Step::unload_clean, Step::report);
+            procedure.go_on_button(instant_dx, Step::unload_clean,
+                                   Step::report);
             return;
         case Step::unload_clean:
             instant_dx.user_interface.print_message(/*Wipe interior*/);
-            procedure.go_on_button(instant_dx, Step::unload_close, Step::unload_open);
+            procedure.go_on_button(instant_dx, Step::unload_close,
+                                   Step::unload_open);
             return;
         case Step::unload_close:
             instant_dx.user_interface.print_message(/*Close door*/);
-            procedure.go_on_button(instant_dx, Step::unload_done, Step::unload_clean);
+            procedure.go_on_button(instant_dx, Step::unload_done,
+                                   Step::unload_clean);
             return;
         case Step::unload_done:
             instant_dx.door.lock();
@@ -184,10 +195,11 @@ void loop() {
         case Step::quit:
             // maybe turn off fan, move stepper to shutdown position, etc.?
             instant_dx.user_interface.print_message(/*Switch off. Goodbye.*/);
-            procedure.go(Step::power_off);  // step 14 is handled by the switch's default case
+            procedure.go(Step::power_off);  // step 14 is handled by the
+                                            // switch's default case
             return;
         case Step::power_off:
             // loop() will do nothing, forever
-            return; 
+            return;
     }
 }

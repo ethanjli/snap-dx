@@ -1,18 +1,13 @@
-#include "HAL.h"
 #include "ControlAlgorithms.h"
+#include "HAL.h"
 
 // The Subsystems classes define high-level interfaces for
 // functionally-related collections of low-level devices.
 
 class UserInterface {
    public:
-    enum class ButtonsState {
-        primary,
-        secondary,
-        both,
-        neither
-    };
-    bool setup() { }
+    enum class ButtonsState { primary, secondary, both, neither };
+    bool setup() {}
 
     void report_initialization_failure() {}
     void print_message() {}
@@ -47,10 +42,10 @@ class ThermalController {
         return true;
     }
 
-    void set_temperature() {}
+    void set_temperature(int temperature) {}
     void start_control() {}
     void stop_control() {}
-    bool temperature_converged() {}
+    bool temperature_converged(int temperature) {}
 
    private:
     Heater heater_1_;
