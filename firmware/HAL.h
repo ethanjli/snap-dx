@@ -55,13 +55,16 @@ class StepperMotor {
     StepperMotor(uint8_t dir_pin, uint8_t step_pin, uint8_t en_pin)
         : dir_pin_(dir_pin),
           step_pin_(step_pin),
-          en_pin_(en_pin),
+          enable_(en_pin, true),
           stepper_(AccelStepper::DRIVER, step_pin_, dir_pin_) {}
     bool setup() {
         pinMode(dir_pin_, OUTPUT);
         pinMode(step_pin_, OUTPUT);
-        pinMode(en_pin_, OUTPUT);
-        digitalWrite(en_pin_, HIGH);
+        if (!enable_.setup()) {
+            return false;
+        }
+
+        enable_.deactivate();
         stepper_.setPinsInverted(false, false, true);
         stepper_.setMaxSpeed(max_velocity * distance_resolution);
         stepper_.setAcceleration(max_acceleration * distance_resolution);
@@ -77,7 +80,7 @@ class StepperMotor {
 
     const uint8_t dir_pin_;
     const uint8_t step_pin_;
-    const uint8_t en_pin_;
+    DigitalOutput enable_;
     AccelStepper stepper_;
 };
 class LimitSwitch {
