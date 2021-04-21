@@ -1,3 +1,5 @@
+// The HAL classes define low-level device drivers.
+
 class LCD {};
 class Button {};
 class ESP32Camera {};

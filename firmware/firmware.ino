@@ -1,5 +1,8 @@
 #include "InstantDx.h"
 
+// The Procedure class defines a state variable representing which step of the
+// procedure we're on. It also provides some utility methods which are used by
+// the loop function to set the next step of the procedure to advance to.
 class Procedure {
    public:
     enum class Step {
@@ -20,9 +23,13 @@ class Procedure {
         power_off = 14
     };
 
+    // Return which step the procedure is on
     Step step() { return step_; }
+    // Change which step the procedure is on
     void go(Step step) { step_ = step; }
 
+    // Wait for a single button-press, then change the step of the procedure
+    // based on which button was pressed
     void go_on_button(InstantDx &instant_dx, Step primary, Step secondary) {
         switch (instant_dx.await_button()) {  // guaranteed to return primary/secondary
             case UserInterface::ButtonsState::primary:
@@ -40,23 +47,34 @@ class Procedure {
 
 // Global variables
 
+// The InstantDx class is defined in InstantDx.h
 InstantDx instant_dx;
+// The Procedure class is defined above
 Procedure procedure;
-InstantDx::TestResult test_result;
+// We need to store the test result as a global variable because
+// step 9 can jump back to step 8 (which displays the test result),
+// so the result needs to persist across steps.
+InstantDx::TestResult test_result = InstantDx::TestResult::invalid;
 
 // Main function
 
-void setup() {}  // setup() is probably not needed
+// setup() is probably not needed, but this is where we'd set up the Serial
+// connection for debugging. Setup of other devices would happen in the setup
+// methods for the corresponding devices in HAL.h
+void setup() {}
 
+// Each time loop is called, it checks the procedure object to determine the
+// current step of the procedure, executes the work defined for that step,
+// and then finishes by setting what should be the current step of the procedure
+// the next time loop is called (this is defined as part of the work for each step).
+// Together, the procedure object and the loop function work as a state machine.
 void loop() {
     using Step = Procedure::Step;
     using ButtonsState = UserInterface::ButtonsState;
     using TestResult = InstantDx::TestResult;
 
-    // Each time loop is called, it runs the current step of the procedure.
-    // The work done in each step of the procedure is defined in the switch block.
-    // That work includes changing the step of the procedure for the next
-    // loop() call.
+    // The work done in each step of the procedure is defined in this switch block.
+    // Each step of the procedure corresponds to one case statement.
     switch (procedure.step()) {
         case Step::power_on:
             procedure.go(Step::initialize);

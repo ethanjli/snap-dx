@@ -1,6 +1,9 @@
 #include "HAL.h"
 #include "ControlAlgorithms.h"
 
+// The Subsystems classes define high-level interfaces for
+// functionally-related collections of low-level devices.
+
 class UserInterface {
    public:
     enum class ButtonsState {
