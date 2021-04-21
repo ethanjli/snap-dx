@@ -46,7 +46,7 @@ class InstantDx {
         door.unlock();
         thermal_controller.stop_control();
     }
-    TestResult await_test();
+    TestResult await_test() {}
     void await_button(UserInterface::ButtonsState buttons_state) {}
     UserInterface::ButtonsState await_button() {} // must return one or two, not both/neither
     void await_temperature(int temperature) {}
