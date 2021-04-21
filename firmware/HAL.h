@@ -27,8 +27,11 @@ class DigitalOutput {
 };
 
 class LCD {};
+
 class Button {};
+
 class ESP32Camera {};
+
 class Thermistor {
    public:
     Thermistor(uint8_t sampling_pin, uint8_t reference_pin)
@@ -49,7 +52,9 @@ class Thermistor {
     const uint8_t reference_pin_;
     int reference_value_;
 };
+
 class Fan {};
+
 class StepperMotor {
    public:
     StepperMotor(uint8_t dir_pin, uint8_t step_pin, uint8_t en_pin)
@@ -83,6 +88,7 @@ class StepperMotor {
     DigitalOutput enable_;
     AccelStepper stepper_;
 };
+
 class LimitSwitch {
    public:
     LimitSwitch(uint8_t pin) : pin_(pin) {}
@@ -98,5 +104,5 @@ class LimitSwitch {
    private:
     const uint8_t pin_;
 };
-class Solenoid {};
+
 class SDCard {};
