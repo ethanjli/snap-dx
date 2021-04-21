@@ -31,9 +31,7 @@ class Procedure {
     // Wait for a single button-press, then change the step of the procedure
     // based on which button was pressed
     void go_on_button(InstantDx &instant_dx, Step primary, Step secondary) {
-        switch (
-            instant_dx
-                .await_button()) {  // guaranteed to return primary/secondary
+        switch (instant_dx.await_button()) {
             case UserInterface::ButtonsState::primary:
                 go(primary);
                 return;
@@ -195,11 +193,11 @@ void loop() {
         case Step::quit:
             // maybe turn off fan, move stepper to shutdown position, etc.?
             instant_dx.user_interface.print_message(/*Switch off. Goodbye.*/);
-            procedure.go(Step::power_off);  // step 14 is handled by the
-                                            // switch's default case
+            procedure.go(Step::power_off);
             return;
         case Step::power_off:
-            // loop() will do nothing, forever
+            // loop() will do nothing, forever, because it will be stuck in this
+            // state
             return;
     }
 }
