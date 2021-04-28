@@ -6,32 +6,52 @@
 class Procedure {
    public:
     enum class Step {
-        power_on = 0,
+        power_on = 0,  // this step is not in the flowchart
         initialize = 1,
         standby = 2,
         load_insert = 3,
         load_close = 4,
         load_lock = 5,
         start = 6,
-        run = 7,
+        // run = 7,  // this step is in the flowchart but is decomposed
+        run_heater_1 = 700,  // this step is not in the flowchart
+        run_stepper = 701,   // this step is not in the flowchart
+        run_tickler = 702,   // this step is not in the flowchart
+        run_heater_2 = 703,  // this step is not in the flowchart
+        run_camera = 704,    // this step is not in the flowchart
         report = 8,
         unload_open = 9,
         unload_clean = 10,
         unload_close = 11,
+        unload_lock = 1100,  // this step is not in the flowchart
         unload_done = 12,
         quit = 13,
-        power_off = 14
+        maintenance = 14,  // this step is not in the flowchart
+        power_off = 15     // this step is not in the flowchart
     };
 
-    // Return which step the procedure is on
+    struct HeatingParameters {
+        uint8_t temperature;
+        unsigned long warmup_timeout;
+        unsigned long hold_duration;
+    };
+
+    static const unsigned int door_lock_time = 1000;                  // ms
+    static const uint8_t door_safe_temperature = 40;                  // deg C
+    static const unsigned long thermal_cooldown_timeout = 60 * 1000;  // ms
+
+    // Return which step the procedure is on.
     Step step() { return step_; }
-    // Change which step the procedure is on
+    // Change which step the procedure is on.
     void go(Step step) { step_ = step; }
 
-    // Wait for a single button-press, then change the step of the procedure
-    // based on which button was pressed
-    void go_on_button(InstantDx &instant_dx, Step primary, Step secondary) {
-        switch (instant_dx.await_button()) {
+    // Wait for a single button press-and-release, then change the step of the
+    // procedure based on which button was released.
+    void go_on_button(InstantDx &instant_dx, const char *primary_label,
+                      Step primary, const char *secondary_label,
+                      Step secondary) {
+        instant_dx.user_interface.label_buttons(primary_label, secondary_label);
+        switch (instant_dx.await_tap()) {
             case UserInterface::ButtonsState::primary:
                 go(primary);
                 return;
@@ -41,9 +61,102 @@ class Procedure {
         }
     }
 
+    // Try to lock the door, then change the step of the procedure based on
+    // whether it succeeded.
+    void go_try_lock(InstantDx &instant_dx, Step success_step,
+                     Step retry_step) {
+        instant_dx.user_interface.print_message("Locking door...");
+        instant_dx.user_interface.label_buttons();  // remove button labels
+        if (instant_dx.await_lock(door_lock_time)) {
+            go(success_step);
+            return;
+        }
+
+        instant_dx.user_interface.print_message(
+            "Error. Door not fully closed.");
+        instant_dx.user_interface.label_buttons("Back");
+        instant_dx.await_tap(instant_dx.user_interface.primary);
+        go(retry_step);
+    }
+
+    // Try to cool down the heaters, then change the step of the procedure based
+    // on whether it succeeded.
+    void go_try_cooldown(InstantDx &instant_dx, Step success_step,
+                         Step failure_step) {
+        if (instant_dx.await_thermal_cooldown(door_safe_temperature, 0)) {
+            // Unit is already cool
+            go(success_step);
+            return;
+        }
+
+        instant_dx.user_interface.print_message("Cooling down...");
+        if (instant_dx.await_thermal_cooldown(door_safe_temperature,
+                                              thermal_cooldown_timeout)) {
+            go(success_step);
+            return;
+        }
+
+        // Unit could not cool down within the required time
+        go(failure_step);
+        return;
+    }
+    // Try to warm up a heater, then change the step of the procedure based
+    // on whether it succeeded.
+    void go_try_heat(InstantDx &instant_dx, ThermalController &controller,
+                     const HeatingParameters &parameters, Step success_step,
+                     Step failure_step) {
+        if (!instant_dx.await_thermal_warmup(controller, parameters.temperature,
+                                             parameters.warmup_timeout)) {
+            go(failure_step);
+            return;
+        }
+
+        instant_dx.await_sleep(parameters.hold_duration);
+        controller.stop_control();
+        go(success_step);
+    }
+
+    // Try to move the stepper to a limit, then change the step of the procedure
+    // based on whether it succeeded.
+    void go_try_move(InstantDx &instant_dx, float velocity,
+                     unsigned long timeout, Step success_step,
+                     Step failure_step) {
+        instant_dx.motion_controller.start_move(velocity);
+        DebouncedSwitch limit =
+            velocity >= 0 ? instant_dx.motion_controller.switch_top
+                          : instant_dx.motion_controller.switch_bottom;
+        if (!instant_dx.await_limit(limit, DebouncedSwitch::State::active,
+                                    timeout)) {
+            go(failure_step);
+            return;
+        }
+
+        go(success_step);
+    }
+
    private:
     Step step_ = Step::power_on;
 };
+
+// Global constants
+
+static constexpr Procedure::HeatingParameters thermal_1_heating{
+    95,              // deg C
+    15 * 60 * 1000,  // ms
+    3 * 60 * 1000    // ms
+};
+static constexpr Procedure::HeatingParameters thermal_2_heating{
+    65,              // deg C
+    15 * 60 * 1000,  // ms
+    40 * 60 * 1000   // ms
+};
+static const unsigned int door_unlock_time = 1 * 1000;          // ms
+static const unsigned int tickler_duration = 20 * 1000;         // ms
+static constexpr float stepper_move_1_distance = 32;            // mm
+static const uint8_t stepper_move_1_speed = 0.5;                // mm/s
+static const unsigned long stepper_move_1_timeout = 30 * 1000;  // ms
+static const uint8_t stepper_move_2_velocity = 5;               // mm/s
+static const unsigned long stepper_move_2_timeout = 5 * 1000;   // ms
 
 // Global variables
 
@@ -54,7 +167,7 @@ Procedure procedure;
 // We need to store the test result as a global variable because
 // step 9 can jump back to step 8 (which displays the test result),
 // so the result needs to persist across steps.
-InstantDx::TestResult test_result = InstantDx::TestResult::invalid;
+ESP32Camera::Result test_result = ESP32Camera::Result::invalid;
 
 // Main function
 
@@ -72,7 +185,7 @@ void setup() {}
 void loop() {
     using Step = Procedure::Step;
     using ButtonsState = UserInterface::ButtonsState;
-    using TestResult = InstantDx::TestResult;
+    using TestResult = ESP32Camera::Result;
 
     // The work done in each step of the procedure is defined in this switch
     // block. Each step of the procedure corresponds to one case statement.
@@ -82,117 +195,119 @@ void loop() {
             return;
         case Step::initialize:
             if (!instant_dx.await_initialize()) {
-                instant_dx.handle_initialization_failure();  // infinite loop
+                instant_dx.await_unlock(door_unlock_time);  // do we actually want to unlock?
+                instant_dx.user_interface.print_message(
+                    "Initialization failed!");
+                instant_dx.user_interface.label_buttons("Ok");
+                instant_dx.await_tap(instant_dx.user_interface.primary);
+                procedure.go(Step::maintenance);
             }
             return;
         case Step::standby:
-            instant_dx.user_interface.print_message(/*InstantDx - v?.?.?*/);
-            instant_dx.user_interface.label_buttons(/*new test, --*/);
-            instant_dx.await_button(ButtonsState::primary);  // new test
-            instant_dx.await_temperature(
-                100);  // what should happen when TEMP_!OK?
-            procedure.go(Step::load_insert);
+            instant_dx.user_interface.print_message("InstantDx - v?.?.?");
+            instant_dx.user_interface.label_buttons("New Test");
+            instant_dx.await_tap(instant_dx.user_interface.primary);
+            procedure.go_try_cooldown(instant_dx, Step::load_insert,
+                                      Step::maintenance);
             return;
         case Step::load_insert:
-            instant_dx.door.unlock();
-            // "beep door open alarm", but the schematic has no alarm!
-            instant_dx.user_interface.print_message(/*Open and insert*/);
-            instant_dx.user_interface.label_buttons(/*done, back*/);
-            procedure.go_on_button(instant_dx, Step::load_close, Step::standby);
+            instant_dx.await_unlock(door_unlock_time);
+            instant_dx.user_interface.print_message("Open and insert");
+            procedure.go_on_button(instant_dx, "Done", Step::load_close, "Back",
+                                   Step::standby);
             return;
         case Step::load_close:
-            instant_dx.user_interface.print_message(/*Close and buckle*/);
-            instant_dx.user_interface.label_buttons(/*done, back*/);
-            procedure.go_on_button(instant_dx, Step::load_lock,
+            instant_dx.user_interface.print_message("Close and buckle");
+            procedure.go_on_button(instant_dx, "Done", Step::load_lock, "Back",
                                    Step::load_insert);
             return;
         case Step::load_lock:
-            instant_dx.user_interface.print_message(/*Locking door...*/);
-            instant_dx.user_interface.label_buttons();  // remove button labels
-            instant_dx.door.lock();
-            // Do we need to wait a bit to ensure the door's properly closed?
-            if (!instant_dx.door.is_open()) {
-                procedure.go(Step::start);
-                return;
-            }
-            instant_dx.user_interface.print_message(
-                /*Error. Door not fully closed.*/);
-            instant_dx.user_interface.label_buttons(/*done, back*/);
-            switch (instant_dx.await_button()) {
-                case ButtonsState::primary:
-                    // what's supposed to happen if this button is pressed?
-                    return;
-                case ButtonsState::secondary:
-                    procedure.go(Step::load_insert);
-                    return;
-            }
+            procedure.go_try_lock(instant_dx, Step::start, Step::load_insert);
             return;
         case Step::start:
-            instant_dx.user_interface.print_message(/*Press start*/);
-            instant_dx.user_interface.label_buttons(/*start, back*/);
-            procedure.go_on_button(instant_dx, Step::run, Step::load_insert);
+            instant_dx.user_interface.print_message("Press start");
+            procedure.go_on_button(instant_dx, "Start", Step::run_heater_1,
+                                   "Back", Step::load_insert);
             return;
-        case Step::run:
-            test_result = instant_dx.await_test();
-            // "timer - if limit switch is not detected after # seconds"
-            // How is the timer supposed to be used?
-            // What's the relationship to the limit switch?
+        case Step::run_heater_1:
+            procedure.go_try_heat(instant_dx, instant_dx.thermal_controller_1,
+                                  thermal_1_heating, Step::run_stepper,
+                                  Step::maintenance);
+            return;
+        case Step::run_stepper:
+            instant_dx.motion_controller.start_move(stepper_move_1_distance,
+                                                    stepper_move_1_speed);
+            instant_dx.await_sleep(stepper_move_1_timeout);
+            procedure.go_try_move(instant_dx, stepper_move_2_velocity,
+                                  stepper_move_2_timeout, Step::run_tickler,
+                                  Step::maintenance);
+        case Step::run_tickler:
+            instant_dx.tickler.activate();
+            instant_dx.await_sleep(tickler_duration);
+            instant_dx.tickler.deactivate();
+            procedure.go(Step::run_heater_2);
+            return;
+        case Step::run_heater_2:
+            procedure.go_try_heat(instant_dx, instant_dx.thermal_controller_2,
+                                  thermal_2_heating, Step::run_camera,
+                                  Step::maintenance);
+            return;
+        case Step::run_camera:
+            test_result = instant_dx.camera.read();
             procedure.go(Step::report);
             return;
         case Step::report:
-            instant_dx.user_interface.label_buttons(/*ok, --*/);
             switch (test_result) {
-                case TestResult::detected:
-                    // Flow chart says to print "un-detected" in the detected
-                    // case! I'm pretty sure the flow-chart is wrong...
-                    instant_dx.user_interface.print_message(/*Un-detected*/);
-                    instant_dx.await_button(ButtonsState::primary);
-                    procedure.go(Step::unload_open);
-                    return;
-                case TestResult::not_detected:
-                    // Flow chart says to print "-detected" in the not detected
-                    // case! I'm pretty sure the flow-chart is wrong...
-                    instant_dx.user_interface.print_message(/*Detected*/);
-                    instant_dx.await_button(ButtonsState::primary);
-                    procedure.go(Step::unload_open);
-                    return;
+                case TestResult::positive:
+                    instant_dx.user_interface.print_message("Detected");
+                    break;
+                case TestResult::negative:
+                    instant_dx.user_interface.print_message("Not detected");
+                    break;
                 case TestResult::invalid:
-                    instant_dx.user_interface.print_message(/*Invalid test*/);
-                    instant_dx.await_button(ButtonsState::primary);
-                    // This implies that we don't unload the sample, clean
-                    // interior, etc. Is this what we want?
-                    procedure.go(Step::quit);
-                    return;
+                    // Camera can't tell if it's positive or negative
+                    instant_dx.user_interface.print_message("Invalid test");
+                    break;
             }
-            // What do the TEMP_!OK and TEMP_OK blocks mean in the arrow to 9?
+            instant_dx.user_interface.label_buttons("Ok");
+            instant_dx.await_tap(instant_dx.user_interface.primary);
+            procedure.go_try_cooldown(instant_dx, Step::unload_open,
+                                      Step::maintenance);
             return;
         case Step::unload_open:
-            instant_dx.await_timeout(1000);
-            // what does "wait (1S)" mean here? why is it only on this door
-            // operation?
-            instant_dx.door.unlock();
-            instant_dx.user_interface.print_message(/*Open and unload*/);
-            procedure.go_on_button(instant_dx, Step::unload_clean,
-                                   Step::report);
+            instant_dx.await_unlock(door_unlock_time);
+            instant_dx.user_interface.print_message("Open and unload");
+            procedure.go_on_button(instant_dx, "Done", Step::unload_clean,
+                                   "Back", Step::report);
             return;
         case Step::unload_clean:
-            instant_dx.user_interface.print_message(/*Wipe interior*/);
-            procedure.go_on_button(instant_dx, Step::unload_close,
-                                   Step::unload_open);
+            instant_dx.user_interface.print_message("Wipe interior");
+            procedure.go_on_button(instant_dx, "Done", Step::unload_close,
+                                   "Back", Step::unload_open);
             return;
         case Step::unload_close:
-            instant_dx.user_interface.print_message(/*Close door*/);
-            procedure.go_on_button(instant_dx, Step::unload_done,
-                                   Step::unload_clean);
+            instant_dx.user_interface.print_message("Close door");
+            procedure.go_on_button(instant_dx, "Done", Step::unload_lock,
+                                   "Back", Step::unload_clean);
+            return;
+        case Step::unload_lock:
+            procedure.go_try_lock(instant_dx, Step::unload_done,
+                                  Step::unload_open);
             return;
         case Step::unload_done:
-            instant_dx.door.lock();
-            instant_dx.user_interface.print_message(/*Please select:*/);
-            procedure.go_on_button(instant_dx, Step::quit, Step::standby);
+            instant_dx.user_interface.print_message("Please select:");
+            procedure.go_on_button(instant_dx, "End", Step::quit, "New Test",
+                                   Step::standby);
             return;
         case Step::quit:
-            // maybe turn off fan, move stepper to shutdown position, etc.?
-            instant_dx.user_interface.print_message(/*Switch off. Goodbye.*/);
+            instant_dx.user_interface.print_message("Switch off. Goodbye.");
+            procedure.go(Step::power_off);
+            return;
+        case Step::maintenance:
+            instant_dx.thermal_controller_1.stop_control();
+            instant_dx.thermal_controller_2.stop_control();
+            instant_dx.user_interface.print_message(
+                "Hardware error. Switch off. Call for help.");
             procedure.go(Step::power_off);
             return;
         case Step::power_off:

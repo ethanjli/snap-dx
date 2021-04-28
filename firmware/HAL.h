@@ -1,6 +1,7 @@
 #include <AccelStepper.h>  // Used by StepperMotor
 
 // The HAL classes define low-level device drivers.
+// These drivers should never call the delay function!
 
 class DigitalOutput {
    public:
@@ -26,11 +27,76 @@ class DigitalOutput {
     const bool active_level_;
 };
 
-class LCD {};
+class DigitalInput {
+   public:
+    DigitalInput(uint8_t pin, bool active_low, bool pull_up)
+        : pin_(pin), active_level_(!active_low), pull_up_(pull_up) {}
 
-class Button {};
+    bool setup() {
+        if (pull_up_) {
+            pinMode(pin_, INPUT_PULLUP);
+        } else {
+            pinMode(pin_, INPUT);
+        }
+        return true;
+    }
 
-class ESP32Camera {};
+    bool is_active() { digitalRead(pin_) == active_level_; }
+
+   private:
+    const uint8_t pin_;
+    const bool active_level_;
+    const bool pull_up_;
+};
+
+class LCD {
+   public:
+    bool setup() {}
+};
+
+class ESP32Camera {
+   public:
+    enum class Result {
+        off = 0,       // 0/0: camera off
+        positive = 1,  // 0/1: camera on, positive result
+        negative = 2,  // 1/0: camera on, negative result
+        invalid = 3    // 1/1: camera on, indeterminate result or invalid state
+    };
+
+    ESP32Camera(uint8_t input_1, uint8_t input_2)
+        : input_1_(input_1, false, false), input_2_(input_2, false, false) {}
+
+    bool setup() {
+        if (!input_1_.setup()) {
+            return false;
+        }
+
+        if (!input_2_.setup()) {
+            return false;
+        }
+
+        // TODO: wait for ESP32 to produce output (maybe a fixed delay)
+        return read() == Result::invalid;
+    }
+
+    Result read() {
+        bool input_1_reading = input_1_.is_active();
+        bool input_2_reading = input_2_.is_active();
+        if (input_1_reading && input_2_reading) {
+            return Result::invalid;
+        } else if (input_1_reading) {
+            return Result::negative;
+        } else if (input_2_reading) {
+            return Result::positive;
+        } else {
+            return Result::off;
+        }
+    }
+
+   private:
+    DigitalInput input_1_;
+    DigitalInput input_2_;
+};
 
 class Thermistor {
    public:
@@ -39,11 +105,7 @@ class Thermistor {
 
     bool setup() {
         analogReadResolution(12);  // Requires Arduino Due, Zero, or MKR
-        // Do we need to wait a bit of time for reading to stabilize?
-        // Is it safe to re-sample the reference pin for each thermistor's
-        // setup routine?
         reference_value_ = analogRead(reference_pin_);
-        // How does the Arduino sketch use ch1, ch2, and ch3?
         return true;
     }
 
@@ -53,8 +115,6 @@ class Thermistor {
     int reference_value_;
 };
 
-class Fan {};
-
 class StepperMotor {
    public:
     StepperMotor(uint8_t dir_pin, uint8_t step_pin, uint8_t en_pin)
@@ -62,6 +122,7 @@ class StepperMotor {
           step_pin_(step_pin),
           enable_(en_pin, true),
           stepper_(AccelStepper::DRIVER, step_pin_, dir_pin_) {}
+
     bool setup() {
         pinMode(dir_pin_, OUTPUT);
         pinMode(step_pin_, OUTPUT);
@@ -88,21 +149,3 @@ class StepperMotor {
     DigitalOutput enable_;
     AccelStepper stepper_;
 };
-
-class LimitSwitch {
-   public:
-    LimitSwitch(uint8_t pin) : pin_(pin) {}
-
-    bool setup() {
-        pinMode(pin_, INPUT_PULLUP);
-        // The prototype sketch uses interrupts, but if we can do polling that
-        // may be better; we also get debouncing this way, which should reduce
-        // weird behavior in the motor
-        return true;
-    }
-
-   private:
-    const uint8_t pin_;
-};
-
-class SDCard {};

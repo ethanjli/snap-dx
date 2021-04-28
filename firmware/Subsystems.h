@@ -1,94 +1,193 @@
-#include "ControlAlgorithms.h"
+#include "Algorithms.h"
 #include "HAL.h"
 
 // The Subsystems classes define high-level interfaces for
 // functionally-related collections of low-level devices.
 
+class DebouncedSwitch {
+   public:
+    enum class State {
+        bouncing,     // switch is transitioning between active and inactive
+        deactivated,  // switch was just deactivated in the last read
+        inactive,     // switch was deactivated before the last read
+        activated,    // switch was just activated down in the last read
+        active        // switch was activated down before the last read
+    };
+
+    DebouncedSwitch(uint8_t pin, bool active_low, bool pull_up)
+        : button_(pin, active_low, pull_up) {}
+
+    bool setup() { return button_.setup(); }
+    // Sample the switch and apply debouncing.
+    void update() {
+        bool debounced;
+        switch (
+            debouncer_.transform(button_.is_active(), millis(), debounced)) {
+            case Debouncer::Status::ok:
+                break;
+            case Debouncer::Status::unstable:
+                state_ = State::bouncing;
+                return;
+            default:
+                return;
+        }
+
+        EdgeDetector::State state;
+        edge_detector_.transform(debounced, state);
+        switch (state) {
+            case EdgeDetector::State::no_edge:
+                break;
+            case EdgeDetector::State::rising_edge:
+                state_ = State::activated;
+            case EdgeDetector::State::falling_edge:
+                state_ = State::deactivated;
+        }
+    }
+    State getState() { return state_; }
+    // Read the debouncing results, apply edge detection, and return result.
+    // Returns activated/deactivated if the switch has been
+    // activated/deactivated since the last call to read(); otherwise, returns
+    // bouncing/active/inactive.
+    State read() {
+        State current_state = state_;
+        switch (state_) {
+            case State::activated:
+                state_ = State::active;
+                break;
+            case State::deactivated:
+                state_ = State::inactive;
+                break;
+            default:
+                break;
+        }
+        return current_state;
+    }
+
+   private:
+    DigitalInput button_;
+    Debouncer debouncer_;
+    EdgeDetector edge_detector_;
+    State state_ = State::bouncing;
+};
+
 class UserInterface {
    public:
     enum class ButtonsState { primary, secondary, both, neither };
-    bool setup() {}
 
-    void report_initialization_failure() {}
-    void print_message() {}
-    void label_buttons() {}
-    // Do we need debouncing of button reads?
-    ButtonsState read_buttons() {}
+    DebouncedSwitch primary;
+    DebouncedSwitch secondary;
+
+    UserInterface(uint8_t primary_button, uint8_t secondary_button)
+        : primary(primary_button, true /* TODO: is button low when pressed? */,
+                  true /* TODO: pullup input? */),
+          secondary(secondary_button,
+                    true /* TODO: is button low when pressed? */,
+                    true /* TODO: pullup input? */) {}
+
+    bool setup() {
+        if (!primary.setup()) {
+            return false;
+        }
+
+        if (!secondary.setup()) {
+            return false;
+        }
+
+        if (!display_.setup()) {
+            return false;
+        }
+    }
+    void update() {
+        primary.update();
+        secondary.update();
+    }
+
+    // Print a C-style string as the UI message
+    // Messages may be up to ??? characters long; beyond that, they'll
+    // need to be animated (e.g. in a marquee style)
+    void print_message(const char *message) {
+        // TODO
+    }
+
+    // Clear button labels
+    void label_buttons() {
+        // TODO
+    }
+    // Set primary label, clear secondary label; takes C-style strings
+    void label_buttons(const char *primary) {
+        // TODO
+    }
+    // Set primary & secondary labels; takes C-style strings
+    void label_buttons(const char *primary, const char *secondary) {
+        // TODO
+    }
 
    private:
     LCD display_;
-    Button button_1_;
-    Button button_2_;
-};
-
-class ColorDetector {
-   public:
-    bool setup() {
-        // wait for ESP32 to produce output (maybe a fixed delay?)
-        // check for ESP32 to output 0/1
-        // "check if camera is working, lights are functioning"
-        // but the schematic does not have lights!
-    }
-
-    void read() {}
-
-   private:
-    ESP32Camera camera_;
 };
 
 class ThermalController {
    public:
-    ThermalController()
-        : heater_1_(44, true),
-          heater_2_(42, true),
-          thermistor_1_(A1, A0),
-          thermistor_2_(A2, A0) {}
+    ThermalController(uint8_t heater, uint8_t thermistor_sampler,
+                      uint8_t thermistor_reference)
+        : heater_(heater, true),
+          thermistor_(thermistor_sampler, thermistor_reference) {}
+
     bool setup() {
-        if (!thermistor_1_.setup()) {
+        if (!thermistor_.setup()) {
             return false;
         }
 
-        if (!thermistor_2_.setup()) {
+        if (!heater_.setup()) {
             return false;
         }
 
-        if (!heater_1_.setup()) {
-            return false;
-        }
-
-        if (!heater_2_.setup()) {
-            return false;
-        }
-
-        // switch on fan
         return true;
     }
+    // Update the heater controller once. Returns immediately.
+    void update() {
+        // TODO
+    }
 
-    void set_temperature(int temperature) {}
-    void start_control() {}
-    void stop_control() {}
-    bool temperature_converged(int temperature) {}
+    // Start driving the heater. Returns immediately.
+    void start_control(int setpoint) {
+        // TODO
+    }
+    // Stop driving the heater, and turn it off. Returns immediately.
+    void stop_control() {
+        // TODO
+    }
+
+    // Read the temperature from the thermistor
+    float read_temperature() {
+        // TODO
+    }
 
    private:
-    DigitalOutput heater_1_;
-    DigitalOutput heater_2_;
-    Thermistor thermistor_1_;
-    Thermistor thermistor_2_;
-    TemperatureControlLoop control_loop_;
-    Fan fan_;
+    DigitalOutput heater_;
+    Thermistor thermistor_;
+    TemperatureControlLoop control_loop_;  // bang-bang with time limit
 };
 
 class MotionController {
    public:
-    MotionController()
-        : stepper_(33, 35, 31), switch_top_(22), switch_bottom_(23) {}
+    DebouncedSwitch switch_top;
+    DebouncedSwitch switch_bottom;
+
+    MotionController(uint8_t dir, uint8_t step, uint8_t en, uint8_t switch_top,
+                     uint8_t switch_bottom)
+        : stepper_(dir, step, en),
+          switch_top(switch_top, true /* TODO: low when pressed? */,
+                     true /* TODO: pullup input? */),
+          switch_bottom(switch_bottom, true /* TODO: low when pressed? */,
+                        true /* TODO: pullup input? */) {}
 
     bool setup() {
-        if (!switch_top_.setup()) {
+        if (!switch_top.setup()) {
             return false;
         }
 
-        if (!switch_bottom_.setup()) {
+        if (!switch_bottom.setup()) {
             return false;
         }
 
@@ -96,76 +195,124 @@ class MotionController {
             return false;
         }
 
-        move_to(0);
-        // Are there any potential hardware faults to catch, e.g. motor can't
-        // move?
-        return true;
+        // Try to go to home position (bottom limit)
+        const float move_speed = 5;                   // mm/s
+        const unsigned long move_timeout = 5 * 1000;  // timeout of 5 sec
+        start_move(-1 * move_speed);                  // move to the bottom
+        const unsigned long start_time = millis();
+        while (true) {
+            update();
+            if (switch_bottom.read() == DebouncedSwitch::State::active) {
+                return true;
+            }
+
+            if (millis() - start_time > move_timeout) {
+                return false;
+            }
+        }
     }
+    // Update stepper controller to target the position set by start_move().
+    // Also updates the limit switch debouncers.
+    void update() {
+        using State = DebouncedSwitch::State;
 
-    // Do we need debouncing of limit switch reads?
-    void move_to(uint32_t position) {}
+        if (velocity_ != 0) {
+            // TODO: update controller. Or maybe updating the controller should be done
+            // in a timer interrupt for consistent timing?
+            // TODO: automatically stop the motor when a displacement is completed.
+        }
 
-   private:
-    StepperMotor stepper_;
-    LimitSwitch switch_top_;
-    LimitSwitch switch_bottom_;
-};
-
-class Mixer {
-   public:
-    Mixer() : tickler_(40, true) {}
-
-    bool setup() {
-        if (!tickler_.setup()) {
-            return false;
+        // Automatically stop the motor when a limit switch is pressed, to
+        // prevent the motor from being forced to stall for extended durations.
+        switch_top.update();
+        switch_bottom.update();
+        State top_state = switch_top.getState();
+        State bottom_state = switch_bottom.getState();
+        if (velocity_ > 0 &&
+            (top_state == State::active || top_state == State::activated)) {
+            stop_move();
+        } else if (velocity_ < 0 && (bottom_state == State::active ||
+                                     bottom_state == State::activated)) {
+            stop_move();
         }
     }
 
-    void start_mixing() {}
-    void stop_mixing() {}
+    // Start a move by a given displacement at a given speed.
+    // A positive displacement moves the motor up, a negative velocity moves it
+    // down. Speed should always be positive. Returns instantly.
+    void start_move(float displacement, float speed) {
+        velocity_ = speed >= 0 ? speed : -1 * speed;
+        float direction = displacement >= 0 ? 1 : -1;
+        velocity_ *= direction;
+        // TODO
+    }
+    // Start a move at the given velocity. A positive velocity moves the
+    // motor up, a negative velocity moves it down. Returns instantly.
+    void start_move(float velocity) {
+        velocity_ = velocity;
+        // TODO
+    }
+    // Send the stepper driver to idle, cancelling any incomplete moves.
+    // Returns instantly.
+    void stop_move() {
+        velocity_ = 0;
+        // TODO
+    }
 
    private:
-    DigitalOutput tickler_;
+    StepperMotor stepper_;
+    float velocity_;
 };
 
 class Door {
    public:
-    Door()
-        : solenoid_(38, true /*is the solenoid an active-low output?*/),
-          lock_switch_(0 /*what pin is used for the door's limit switch?*/) {}
+    Door(uint8_t solenoid, uint8_t lock_switch)
+        : solenoid_(solenoid, true),
+          lock_switch_(lock_switch,
+                       true /* TODO: is switch low when pressed? */,
+                       true /* TODO: pullup input? */) {}
     bool setup() {
+        if (!solenoid_.setup()) {
+            return false;
+        }
+
         if (!lock_switch_.setup()) {
             return false;
         }
 
         if (!is_open()) {
-            lock();
+            start_lock();
+            // TODO: do we actually need to try to lock the door as part of
+            // setup? Shouldn't the door naturally be locked by default?
             return true;
         } else {
-            // apparently we just "beep alarm"
-            // but the schematic does not have beeper!
             return false;
         }
     }
 
-    void lock() {}
-    void unlock() {}
-    bool is_open() {}
-
-   private:
-    DigitalOutput solenoid_;
-    LimitSwitch lock_switch_;
-};
-
-class EventLogger {
-   public:
-    bool setup() {
-        // check if SD card is present
-        // ensure that SD card has the proper data structure/filesystem
+    // Update the limit switch debouncer
+    void update() {
+        lock_switch_.update();
     }
-    void log_initialization_failure() {}
-    void log() {}
+
+    // Make the solenoid lock. Returns immediately.
+    void start_lock() {
+        solenoid_.deactivate();
+    }
+    // Make the solenoid unlock. Returns immediately.
+    void start_unlock() {
+        solenoid_.activate();
+    }
+    // Check whether the door is open.
+    bool is_open() {
+        using State = DebouncedSwitch::State;
+
+        State state = lock_switch_.read();
+        return state == State::inactive || state == State::deactivated;
+    }
 
    private:
-    SDCard sd_card_;
+    DigitalOutput solenoid_;  // by default (when there's no power) the door is
+                              // locked; to unlock, write HIGH (need to check)
+    DebouncedSwitch lock_switch_;
 };
