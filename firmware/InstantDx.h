@@ -9,13 +9,13 @@ class InstantDx {
    public:
     InstantDx()
         : user_interface(51, 53),
-          camera(0 /* TODO: pin 1? */, 0 /* TODO: pin 2? */),
+          camera(45, 47),
           thermal_controller_1(44, A1, A0, 1000 * 10, 1000 * 20),
           thermal_controller_2(42, A2, A0, 1000 * 5, 1000 * 5),
-          fan(42 /* TODO: fan pin? */, true),
+          fan(36, true),
           motion_controller(33, 35, 31, 22, 23),
           tickler(40, true),
-          door(38, 0 /*TODO: solenoid pin? */) {}
+          door(38, 24) {}
 
     UserInterface user_interface;
     ESP32Camera camera;
@@ -38,7 +38,7 @@ class InstantDx {
         user_interface.print_message("Initializing...");
         /*if (!camera.setup()) {
             return false;
-        }
+        }*/
 
         if (!thermal_controller_1.setup()) {
             return false;
@@ -53,15 +53,15 @@ class InstantDx {
         }
 
         fan.activate();
-        if (!motion_controller.setup()) {
+        /*if (!motion_controller.setup()) {
             return false;
-        }
+        }*/
 
         if (!tickler.setup()) {
             return false;
         }
 
-        if (!door.setup()) {
+        /*if (!door.setup()) {
             return false;
         }*/
 
