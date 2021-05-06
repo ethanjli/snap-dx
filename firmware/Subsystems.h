@@ -216,52 +216,50 @@ class MotionController {
     void update() {
         using State = DebouncedSwitch::State;
 
-        if (velocity_ != 0) {
-            // TODO: update controller. Or maybe updating the controller should be done
-            // in a timer interrupt for consistent timing?
-            // TODO: automatically stop the motor when a displacement is completed.
-        }
-
         // Automatically stop the motor when a limit switch is pressed, to
         // prevent the motor from being forced to stall for extended durations.
         switch_top.update();
         switch_bottom.update();
         State top_state = switch_top.getState();
         State bottom_state = switch_bottom.getState();
-        if (velocity_ > 0 &&
+        if (stepper_.remaining_estimated_displacement() > 0 &&
             (top_state == State::active || top_state == State::activated)) {
             stop_move();
-        } else if (velocity_ < 0 && (bottom_state == State::active ||
-                                     bottom_state == State::activated)) {
+            return;
+        } else if (stepper_.remaining_estimated_displacement() < 0 &&
+                   (bottom_state == State::active ||
+                    bottom_state == State::activated)) {
             stop_move();
+            return;
         }
+
+        // Run the stepper driver
+        stepper_.update();
     }
 
     // Start a move by a given displacement at a given speed.
     // A positive displacement moves the motor up, a negative velocity moves it
     // down. Speed should always be positive. Returns instantly.
-    void start_move(float displacement, float speed) {
-        velocity_ = speed >= 0 ? speed : -1 * speed;
+    void start_move(float displacement, float target_speed) {
+        float target_velocity = target_speed >= 0 ? target_speed : -1 * target_speed;
         float direction = displacement >= 0 ? 1 : -1;
-        velocity_ *= direction;
-        // TODO
+        target_velocity *= direction;
+        stepper_.start_move(displacement, target_velocity);
     }
     // Start a move at the given velocity. A positive velocity moves the
     // motor up, a negative velocity moves it down. Returns instantly.
-    void start_move(float velocity) {
-        velocity_ = velocity;
-        // TODO
+    void start_move(float target_velocity) {
+        stepper_.start_move(indefinite_displacement, target_velocity);
     }
     // Send the stepper driver to idle, cancelling any incomplete moves.
     // Returns instantly.
     void stop_move() {
-        velocity_ = 0;
-        // TODO
+        stepper_.stop_move();
     }
 
    private:
+    static constexpr float indefinite_displacement = 300;  // mm
     StepperMotor stepper_;
-    float velocity_;
 };
 
 class Door {
@@ -291,18 +289,12 @@ class Door {
     }
 
     // Update the limit switch debouncer
-    void update() {
-        lock_switch_.update();
-    }
+    void update() { lock_switch_.update(); }
 
     // Make the solenoid lock. Returns immediately.
-    void start_lock() {
-        solenoid_.deactivate();
-    }
+    void start_lock() { solenoid_.deactivate(); }
     // Make the solenoid unlock. Returns immediately.
-    void start_unlock() {
-        solenoid_.activate();
-    }
+    void start_unlock() { solenoid_.activate(); }
     // Check whether the door is open.
     bool is_open() {
         using State = DebouncedSwitch::State;

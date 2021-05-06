@@ -133,19 +133,45 @@ class StepperMotor {
         enable_.deactivate();
         stepper_.setPinsInverted(false, false, true);
         stepper_.setMaxSpeed(max_velocity * distance_resolution);
-        stepper_.setAcceleration(max_acceleration * distance_resolution);
+        stepper_.setAcceleration(acceleration * distance_resolution);
         stepper_.enableOutputs();
         return true;
+    }
+    void update() {
+        if (stepper_.remaining_estimated_displacement() == 0) {
+            stepper_.stop_move();
+            return;
+        }
+
+        stepper_.run();
+    }
+
+    void start_move(float displacement, float target_velocity) {
+        stepper_.setMaxSpeed(target_velocity * distance_resolution);
+        stepper_.setAcceleration(acceleration * distance_resolution);
+        target_position_ = stepper_.currentPosition() + displacement;
+        stepper_.moveTo(target_position_);
+        moving_ = true;
+        enable_.activate();
+    }
+    void stop_move() {
+        moving_ = false;
+        enable_.deactivate();
+    }
+    long remaining_estimated_displacement() {
+        return stepper_.distanceToGo();
     }
 
    private:
     static const int microsteps = 16;
     static const long distance_resolution = 500 * microsteps;  // steps/mm
     static constexpr float max_velocity = 18.29;               // mm/s
-    static constexpr float max_acceleration = 100;             // mm/s/s
+    static constexpr float acceleration = 10;                  // mm/s/s
 
     const uint8_t dir_pin_;
     const uint8_t step_pin_;
     DigitalOutput enable_;
     AccelStepper stepper_;
+    long target_position_ = 0;
+    bool moving_ = false;
 };
