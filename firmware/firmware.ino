@@ -210,10 +210,12 @@ void loop() {
             instant_dx.user_interface.print_message("InstantDx - v?.?.?");
             instant_dx.user_interface.label_buttons("New Test");
             instant_dx.await_tap(instant_dx.user_interface.primary);
+            instant_dx.user_interface.print_message("DEBUG: Cooling down...");
             procedure.go_try_cooldown(instant_dx, Step::load_insert,
                                       Step::maintenance);
             return;
         case Step::load_insert:
+            instant_dx.user_interface.print_message("DEBUG: Unlocking door...");
             instant_dx.await_unlock(door_unlock_time);
             instant_dx.user_interface.print_message("Open and insert");
             procedure.go_on_button(instant_dx, "Done", Step::load_close, "Back",
