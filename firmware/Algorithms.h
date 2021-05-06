@@ -1,4 +1,55 @@
-class TemperatureControlLoop {};
+class TemperatureControlLoop {
+   public:
+    TemperatureControlLoop(unsigned long pulse_on_max_duration,
+                           unsigned long pulse_off_duration)
+        : pulse_on_max_duration(pulse_on_max_duration),
+          pulse_off_duration(pulse_off_duration) {}
+
+    // Returns whether the heater should be active
+    bool update(float temperature) {
+        if (!controlling_) {
+            return false;
+        }
+
+        if (pulse_on_) {
+            if ((millis() - pulse_on_start_ > pulse_on_max_duration) ||
+                temperature > setpoint_) {
+                pulse_on_ = false;
+                pulse_off_start_ = millis();
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        if (millis() - pulse_off_start_ > pulse_off_duration) {
+            pulse_on_ = true;
+            pulse_on_start_ = millis();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    void start_control(float setpoint) {
+        setpoint_ = setpoint;
+        controlling_ = true;
+    }
+    void stop_control() {
+        controlling_ = false;
+    }
+
+   private:
+    const unsigned long pulse_on_max_duration;  // ms
+    const unsigned long pulse_off_duration;     // ms
+
+    bool controlling_ = false;
+    float setpoint_ = 0;
+    // TODO: need descriptions of these variables
+    unsigned long pulse_on_start_ = 0;   // ms
+    unsigned long pulse_off_start_ = 0;  // ms
+    bool pulse_on_ = false;
+};
 
 class Debouncer {
    public:
@@ -40,8 +91,8 @@ class Debouncer {
 
    private:
     static const unsigned long debounce_time_limit = 2000;  // ms
-    unsigned long sampling_period_ = 1;  // ms
-    unsigned long last_sample_time_ = 0;  // ms
+    unsigned long sampling_period_ = 1;                     // ms
+    unsigned long last_sample_time_ = 0;                    // ms
     uint8_t integrator_ = 0;
     unsigned long last_time_stable_ = 0;  // ms
     const uint8_t max_integrator_samples = 100;

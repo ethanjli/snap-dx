@@ -31,7 +31,7 @@ class Procedure {
     };
 
     struct HeatingParameters {
-        uint8_t temperature;
+        float temperature;
         unsigned long warmup_timeout;
         unsigned long hold_duration;
     };
@@ -141,12 +141,12 @@ class Procedure {
 // Global constants
 
 static constexpr Procedure::HeatingParameters thermal_1_heating{
-    95,              // deg C
+    95.0,            // deg C
     15 * 60 * 1000,  // ms
     3 * 60 * 1000    // ms
 };
 static constexpr Procedure::HeatingParameters thermal_2_heating{
-    65,              // deg C
+    65.0,            // deg C
     15 * 60 * 1000,  // ms
     40 * 60 * 1000   // ms
 };

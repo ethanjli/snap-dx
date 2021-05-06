@@ -109,7 +109,23 @@ class Thermistor {
         return true;
     }
 
+    float temperature() {
+        float frac = 1.0 * analogRead(sampling_pin_) / analogRead(reference_pin_);
+        // Value of the thermistor
+        float R_th = R * frac / (1 - frac); // Ohm
+        float T = 1 / (A + B * log(R_th / R_0)) - T_0; // deg C
+
+        return T;
+    }
+
    private:
+    // Value of the resistor in the thermistor circuit
+    static constexpr float R = 1977;  // Ohm
+    static constexpr float A = 0.003354; // K^-1
+    static constexpr float B = 0.000289; // K^-1
+    static constexpr float R_0 = 10000; // Ohm
+    static constexpr float T_0 = 273.15; // K
+
     const uint8_t sampling_pin_;
     const uint8_t reference_pin_;
     int reference_value_;
@@ -138,8 +154,8 @@ class StepperMotor {
         return true;
     }
     void update() {
-        if (stepper_.remaining_estimated_displacement() == 0) {
-            stepper_.stop_move();
+        if (remaining_estimated_displacement() == 0) {
+            stop_move();
             return;
         }
 
@@ -158,9 +174,7 @@ class StepperMotor {
         moving_ = false;
         enable_.deactivate();
     }
-    long remaining_estimated_displacement() {
-        return stepper_.distanceToGo();
-    }
+    long remaining_estimated_displacement() { return stepper_.distanceToGo(); }
 
    private:
     static const int microsteps = 16;

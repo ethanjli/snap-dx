@@ -128,13 +128,18 @@ class UserInterface {
 
 class ThermalController {
    public:
+    Thermistor thermistor;
+
     ThermalController(uint8_t heater, uint8_t thermistor_sampler,
-                      uint8_t thermistor_reference)
+                      uint8_t thermistor_reference,
+                      unsigned long pulse_on_max_duration,
+                      unsigned long pulse_off_duration)
         : heater_(heater, true),
-          thermistor_(thermistor_sampler, thermistor_reference) {}
+          thermistor(thermistor_sampler, thermistor_reference),
+          control_loop_(pulse_on_max_duration, pulse_off_duration) {}
 
     bool setup() {
-        if (!thermistor_.setup()) {
+        if (!thermistor.setup()) {
             return false;
         }
 
@@ -142,31 +147,35 @@ class ThermalController {
             return false;
         }
 
+        stop_control();
         return true;
     }
     // Update the heater controller once. Returns immediately.
     void update() {
-        // TODO
+        if (control_loop_.update(thermistor.temperature())) {
+            heater_.activate();
+        } else {
+            heater_.deactivate();
+        }
     }
 
     // Start driving the heater. Returns immediately.
-    void start_control(int setpoint) {
-        // TODO
+    void start_control(float setpoint) {
+        control_loop_.start_control(setpoint);
     }
     // Stop driving the heater, and turn it off. Returns immediately.
     void stop_control() {
-        // TODO
-    }
-
-    // Read the temperature from the thermistor
-    float read_temperature() {
-        // TODO
+        control_loop_.stop_control();
+        heater_.deactivate();
     }
 
    private:
+    static const unsigned long update_interval = 500;  // ms
+
     DigitalOutput heater_;
-    Thermistor thermistor_;
-    TemperatureControlLoop control_loop_;  // bang-bang with time limit
+    TemperatureControlLoop control_loop_;  // like bang-bang with a constant duty cycle
+    float temperature_ = 0;
+    unsigned long last_measurement_time_ = 0;
 };
 
 class MotionController {
@@ -241,7 +250,8 @@ class MotionController {
     // A positive displacement moves the motor up, a negative velocity moves it
     // down. Speed should always be positive. Returns instantly.
     void start_move(float displacement, float target_speed) {
-        float target_velocity = target_speed >= 0 ? target_speed : -1 * target_speed;
+        float target_velocity =
+            target_speed >= 0 ? target_speed : -1 * target_speed;
         float direction = displacement >= 0 ? 1 : -1;
         target_velocity *= direction;
         stepper_.start_move(displacement, target_velocity);
@@ -253,9 +263,7 @@ class MotionController {
     }
     // Send the stepper driver to idle, cancelling any incomplete moves.
     // Returns instantly.
-    void stop_move() {
-        stepper_.stop_move();
-    }
+    void stop_move() { stepper_.stop_move(); }
 
    private:
     static constexpr float indefinite_displacement = 300;  // mm

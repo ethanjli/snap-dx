@@ -11,8 +11,8 @@ class InstantDx {
         : user_interface(0 /* TODO: primary button pin? */,
                          0 /* TODO: secondary button pin? */),
           camera(0 /* TODO: pin 1? */, 0 /* TODO: pin 2? */),
-          thermal_controller_1(44, A1, A0),
-          thermal_controller_2(42, A2, A0),
+          thermal_controller_1(44, A1, A0, 1000 * 10, 1000 * 20),
+          thermal_controller_2(42, A2, A0, 1000 * 5, 1000 * 5),
           fan(42 /* TODO: fan pin? */, true),
           motion_controller(33, 35, 31, 22, 23),
           tickler(40, true),
@@ -136,12 +136,12 @@ class InstantDx {
 
     // Wait for heater to warm up past the threshold
     bool await_thermal_warmup(ThermalController &thermal_controller,
-                              int threshold, unsigned long timeout) {
+                              float threshold, unsigned long timeout) {
         thermal_controller.start_control(threshold);
         const unsigned long start_time = millis();
         while (true) {
             background_update();  // updates thermal control loop
-            if (thermal_controller.read_temperature() > threshold) {
+            if (thermal_controller.thermistor.temperature() > threshold) {
                 return true;
             }
 
@@ -151,14 +151,14 @@ class InstantDx {
         }
     }
     // Wait for both heaters to cool down past the threshold
-    bool await_thermal_cooldown(int threshold, unsigned long timeout) {
+    bool await_thermal_cooldown(float threshold, unsigned long timeout) {
         thermal_controller_1.stop_control();
         thermal_controller_2.stop_control();
         const unsigned long start_time = millis();
         while (true) {
             background_update();
-            if (thermal_controller_1.read_temperature() < threshold &&
-                thermal_controller_2.read_temperature() < threshold) {
+            if (thermal_controller_1.thermistor.temperature() < threshold &&
+                thermal_controller_2.thermistor.temperature() < threshold) {
                 return true;
             }
 
