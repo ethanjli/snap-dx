@@ -1,3 +1,7 @@
+#pragma once
+
+#include "Util.h"
+
 class TemperatureControlLoop {
    public:
     TemperatureControlLoop(unsigned long pulse_on_max_duration,
@@ -6,38 +10,39 @@ class TemperatureControlLoop {
           pulse_off_duration(pulse_off_duration) {}
 
     // Returns whether the heater should be active
-    bool update(float temperature) {
+    bool update(unsigned long current_time, float temperature) {
         if (!controlling_) {
             return false;
         }
 
         if (pulse_on_) {
-            if ((millis() - pulse_on_start_ > pulse_on_max_duration) ||
+            if (past_timeout(current_time, pulse_on_start_,
+                             pulse_on_max_duration) ||
                 temperature > setpoint_) {
                 pulse_on_ = false;
-                pulse_off_start_ = millis();
+                pulse_off_start_ = current_time;
                 return false;
             } else {
                 return true;
             }
         }
 
-        if (millis() - pulse_off_start_ > pulse_off_duration) {
+        if (past_timeout(current_time, pulse_off_start_, pulse_off_duration)) {
             pulse_on_ = true;
-            pulse_on_start_ = millis();
+            pulse_on_start_ = current_time;
             return true;
         } else {
             return false;
         }
     }
 
+    // Activates the control loop
     void start_control(float setpoint) {
         setpoint_ = setpoint;
         controlling_ = true;
     }
-    void stop_control() {
-        controlling_ = false;
-    }
+    // Deactivates the control loop
+    void stop_control() { controlling_ = false; }
 
    private:
     const unsigned long pulse_on_max_duration;  // ms
@@ -58,7 +63,7 @@ class Debouncer {
     Debouncer() = default;
     // Return debounced signal from input signal
     Status transform(bool input, uint32_t current_time, bool &output) {
-        if (current_time - last_sample_time_ < sampling_period_) {
+        if (!past_timeout(current_time, last_sample_time_, sampling_period_)) {
             return Status::waiting;
         }
 
@@ -81,7 +86,8 @@ class Debouncer {
                                                    // integrator got corrupted
         }
         // Report switch fault if debounce time exceeds the maximum limit
-        if (current_time - last_time_stable_ > debounce_time_limit) {
+        if (past_timeout(current_time, last_time_stable_,
+                         debounce_time_limit)) {
             return Status::unstable;
         }
         output = output_;

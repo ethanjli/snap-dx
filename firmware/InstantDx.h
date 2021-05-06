@@ -1,4 +1,7 @@
+#pragma once
+
 #include "Subsystems.h"
+#include "Util.h"
 
 // The InstantDx class provides access to the various devices in
 // the system. It also defines routines which take a long time to
@@ -75,7 +78,7 @@ class InstantDx {
         // Background_update always runs at least once, even if timeout is 0
         while (true) {
             background_update();
-            if (millis() - start_time > timeout) {
+            if (past_timeout(start_time, timeout)) {
                 return;
             }
         }
@@ -144,7 +147,7 @@ class InstantDx {
                 return true;
             }
 
-            if (millis() - start_time > timeout) {
+            if (past_timeout(start_time, timeout)) {
                 return false;
             }
         }
@@ -161,7 +164,7 @@ class InstantDx {
                 return true;
             }
 
-            if (millis() - start_time > timeout) {
+            if (past_timeout(start_time, timeout)) {
                 return false;
             }
         }
@@ -184,19 +187,56 @@ class InstantDx {
         return !door.is_open();
     }
 
+    // Wait for the specified displacement movement to complete (successfully or
+    // unsuccessfully), but give up as a failure if it's not finished within a
+    // timeout, or if it was cancelled by a limit switch.
+    bool await_move(float displacement, float target_speed,
+                    unsigned long timeout) {
+        const unsigned long start_time = millis();
+        motion_controller.start_move(displacement, target_speed);
+        // background_update always runs at least once.
+        while (true) {
+            background_update();  // updates motion control loop
+            if (motion_controller.moved_into_top_limit() ||
+                motion_controller.moved_into_bottom_limit()) {
+                return false;
+            }
+
+            if (!motion_controller.moving()) {
+                return true;
+            }
+
+            if (past_timeout(start_time, timeout)) {
+                return false;
+            }
+        }
+    }
+
+    // Wait for the specified move to a limit to complete, but give up as a
+    // failure if it's not finished within a timeout.
+    bool await_move(float target_velocity, unsigned long timeout) {
+        const DebouncedSwitch &limit = target_velocity >= 0
+                                           ? motion_controller.switch_top
+                                           : motion_controller.switch_bottom;
+        motion_controller.start_move(target_velocity);
+        return await_limit_press(limit, timeout);
+    }
+
     // Wait for the specified limit switch to be pressed, but give up
     // as a failure if it's not pressed within a timeout.
-    bool await_limit(DebouncedSwitch button, DebouncedSwitch::State state,
-                     unsigned long timeout) {
+    bool await_limit_press(DebouncedSwitch button, unsigned long timeout) {
+        using State = DebouncedSwitch::State;
+
         const unsigned long start_time = millis();
         // background_update always runs at least once.
         while (true) {
             background_update();  // updates motion control loop and button
-            if (button.read() == state) {
+            State state = button.read();
+            if (state == State::active || state == State::activated) {
                 return true;
             }
 
-            if (millis() - start_time > timeout) {
+            if (past_timeout(start_time, timeout)) {
                 return false;
             }
         }

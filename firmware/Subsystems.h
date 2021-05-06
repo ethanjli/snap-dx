@@ -1,5 +1,12 @@
+#pragma once
+
 #include "Algorithms.h"
 #include "HAL.h"
+#include "Util.h"
+
+bool past_timeout(unsigned long previous_time, unsigned long timeout) {
+    return past_timeout(millis(), previous_time, timeout);
+}
 
 // The Subsystems classes define high-level interfaces for
 // functionally-related collections of low-level devices.
@@ -149,7 +156,7 @@ class ThermalController {
           thermistor(thermistor_sampler, thermistor_reference),
           control_loop_(pulse_on_max_duration, pulse_off_duration) {}
 
-    // Should always return true
+    // Should always return true. Initializes the heater as deactivated.
     bool setup() {
         if (!thermistor.setup()) {
             // Should never happen, at least for the current implementation of
@@ -168,18 +175,18 @@ class ThermalController {
     }
     // Update the heater controller once. Returns immediately.
     void update() {
-        if (control_loop_.update(thermistor.temperature())) {
+        if (control_loop_.update(millis(), thermistor.temperature())) {
             heater_.activate();
         } else {
             heater_.deactivate();
         }
     }
 
-    // Start driving the heater. Returns immediately.
+    // Start controlling the heater. Returns immediately.
     void start_control(float setpoint) {
         control_loop_.start_control(setpoint);
     }
-    // Stop driving the heater, and turn it off. Returns immediately.
+    // Stop controlling the heater, and turn it off. Returns immediately.
     void stop_control() {
         control_loop_.stop_control();
         heater_.deactivate();
@@ -192,7 +199,6 @@ class ThermalController {
     TemperatureControlLoop
         control_loop_;  // like bang-bang with a constant duty cycle
     float temperature_ = 0;
-    unsigned long last_measurement_time_ = 0;
 };
 
 class MotionController {
@@ -236,34 +242,25 @@ class MotionController {
                 return true;
             }
 
-            if (millis() - start_time > move_timeout) {
+            if (past_timeout(start_time, move_timeout)) {
                 return false;
             }
         }
     }
     // Update stepper controller to target the position set by start_move().
-    // Also updates the limit switch debouncers.
+    // Also updates the limit switch debouncers. Automatically stops when the
+    // move is complete or a limit switch is hit.
     void update() {
-        using State = DebouncedSwitch::State;
-
-        // Automatically stop the motor when a limit switch is pressed, to
-        // prevent the motor from being forced to stall for extended durations.
         switch_top.update();
         switch_bottom.update();
-        State top_state = switch_top.getState();
-        State bottom_state = switch_bottom.getState();
-        if (stepper_.remaining_estimated_displacement() > 0 &&
-            (top_state == State::active || top_state == State::activated)) {
-            stop_move();
-            return;
-        } else if (stepper_.remaining_estimated_displacement() < 0 &&
-                   (bottom_state == State::active ||
-                    bottom_state == State::activated)) {
-            stop_move();
-            return;
+        if (moved_into_top_limit() || moved_into_bottom_limit()) {
+            // Cancel the move to prevent a stall
+            stepper_.stop_move();
         }
-
-        // Run the stepper driver
+        if (stepper_.remaining_displacement() == 0) {
+            // Record that the move has finished
+            stepper_.stop_move();
+        }
         stepper_.update();
     }
 
@@ -271,22 +268,40 @@ class MotionController {
     // A positive displacement moves the motor up, a negative velocity moves it
     // down. Speed should always be positive. Returns instantly.
     void start_move(float displacement, float target_speed) {
-        float target_velocity =
-            target_speed >= 0 ? target_speed : -1 * target_speed;
-        float direction = displacement >= 0 ? 1 : -1;
-        target_velocity *= direction;
-        stepper_.start_move(displacement, target_velocity);
+        stepper_.start_move(displacement, target_speed);
     }
     // Start a move at the given velocity. A positive velocity moves the
     // motor up, a negative velocity moves it down. Returns instantly.
     void start_move(float target_velocity) {
-        stepper_.start_move(indefinite_displacement, target_velocity);
+        float direction = target_velocity >= 0 ? 1 : -1;
+        float target_speed =
+            target_velocity >= 0 ? target_velocity : -1 * target_velocity;
+        stepper_.start_move(direction * indefinite_displacement, target_speed);
     }
-    // Send the stepper driver to idle, cancelling any incomplete moves.
-    // Returns instantly.
-    void stop_move() { stepper_.stop_move(); }
+    // Return whether the motion controller is in the middle of a move
+    bool moving() { return stepper_.moving(); }
+
+    // Return whether the top limit switch interrupted the most recent move
+    bool moved_into_top_limit() {
+        using State = DebouncedSwitch::State;
+
+        State top_state = switch_top.getState();
+        return stepper_.remaining_displacement() > 0 &&
+               (top_state == State::active || top_state == State::activated);
+    }
+    // Return whether the bottom limit switch interrupted the most recent move
+    bool moved_into_bottom_limit() {
+        using State = DebouncedSwitch::State;
+
+        State bottom_state = switch_bottom.getState();
+        return stepper_.remaining_displacement() < 0 &&
+               (bottom_state == State::active ||
+                bottom_state == State::activated);
+    }
 
    private:
+    // This is greater than the max travel of the linear actuator, so it should
+    // hit a limit switch first.
     static constexpr float indefinite_displacement = 300;  // mm
     StepperMotor stepper_;
 };

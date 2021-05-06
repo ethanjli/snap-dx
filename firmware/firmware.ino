@@ -5,7 +5,7 @@
 // the loop function to set the next step of the procedure to advance to.
 class Procedure {
    public:
-    enum class Step {
+    enum class Step : uint16_t {
         power_on = 0,  // this step is not in the flowchart
         initialize = 1,
         standby = 2,
@@ -14,11 +14,12 @@ class Procedure {
         load_lock = 5,
         start = 6,
         // run = 7,  // this step is in the flowchart but is decomposed
-        run_heater_1 = 700,  // this step is not in the flowchart
-        run_stepper = 701,   // this step is not in the flowchart
-        run_tickler = 702,   // this step is not in the flowchart
-        run_heater_2 = 703,  // this step is not in the flowchart
-        run_camera = 704,    // this step is not in the flowchart
+        run_heater_1 = 700,   // this step is not in the flowchart
+        run_stepper_1 = 701,  // this step is not in the flowchart
+        run_stepper_2 = 702,  // this step is not in the flowchart
+        run_tickler = 703,    // this step is not in the flowchart
+        run_heater_2 = 704,   // this step is not in the flowchart
+        run_camera = 705,     // this step is not in the flowchart
         report = 8,
         unload_open = 9,
         unload_clean = 10,
@@ -43,7 +44,11 @@ class Procedure {
     // Return which step the procedure is on.
     Step step() { return step_; }
     // Change which step the procedure is on.
-    void go(Step step) { step_ = step; }
+    void go(Step step) {
+        step_ = step;
+        Serial.print("DEBUG: procedure going to step ");
+        Serial.println(static_cast<uint16_t>(step_));
+    }
 
     // Wait for a single button press-and-release, then change the step of the
     // procedure based on which button was released.
@@ -116,17 +121,25 @@ class Procedure {
         go(success_step);
     }
 
+    // Try to move the stepper by a displacement, then change the step of the
+    // procedure based on whether it succeeded.
+    void go_try_move(InstantDx &instant_dx, float displacement, float speed,
+                     unsigned long timeout, Step success_step,
+                     Step failure_step) {
+        if (!instant_dx.await_move(displacement, speed, timeout)) {
+            go(failure_step);
+            return;
+        }
+
+        go(success_step);
+    }
+
     // Try to move the stepper to a limit, then change the step of the procedure
     // based on whether it succeeded.
     void go_try_move(InstantDx &instant_dx, float velocity,
                      unsigned long timeout, Step success_step,
                      Step failure_step) {
-        instant_dx.motion_controller.start_move(velocity);
-        DebouncedSwitch limit =
-            velocity >= 0 ? instant_dx.motion_controller.switch_top
-                          : instant_dx.motion_controller.switch_bottom;
-        if (!instant_dx.await_limit(limit, DebouncedSwitch::State::active,
-                                    timeout)) {
+        if (!instant_dx.await_move(velocity, timeout)) {
             go(failure_step);
             return;
         }
@@ -152,7 +165,7 @@ static constexpr Procedure::HeatingParameters thermal_2_heating{
 };
 static const unsigned int door_unlock_time = 1 * 1000;          // ms
 static const unsigned int tickler_duration = 20 * 1000;         // ms
-static constexpr float stepper_move_1_distance = 32;            // mm
+static constexpr float stepper_move_1_displacement = 32;        // mm
 static const uint8_t stepper_move_1_speed = 0.5;                // mm/s
 static const unsigned long stepper_move_1_timeout = 30 * 1000;  // ms
 static const uint8_t stepper_move_2_velocity = 5;               // mm/s
@@ -199,9 +212,9 @@ void loop() {
                 return;
             }
 
-            instant_dx.await_unlock(door_unlock_time);  // do we actually want to unlock?
-            instant_dx.user_interface.print_message(
-                "Initialization failed!");
+            instant_dx.await_unlock(
+                door_unlock_time);  // do we actually want to unlock?
+            instant_dx.user_interface.print_message("Initialization failed!");
             instant_dx.user_interface.label_buttons("Ok");
             instant_dx.await_tap(instant_dx.user_interface.primary);
             procedure.go(Step::maintenance);
@@ -236,13 +249,14 @@ void loop() {
             return;
         case Step::run_heater_1:
             procedure.go_try_heat(instant_dx, instant_dx.thermal_controller_1,
-                                  thermal_1_heating, Step::run_stepper,
+                                  thermal_1_heating, Step::run_stepper_1,
                                   Step::maintenance);
             return;
-        case Step::run_stepper:
-            instant_dx.motion_controller.start_move(stepper_move_1_distance,
-                                                    stepper_move_1_speed);
-            instant_dx.await_sleep(stepper_move_1_timeout);
+        case Step::run_stepper_1:
+            procedure.go_try_move(instant_dx, stepper_move_1_displacement,
+                                  stepper_move_1_speed, stepper_move_1_timeout,
+                                  Step::run_stepper_2, Step::maintenance);
+        case Step::run_stepper_2:
             procedure.go_try_move(instant_dx, stepper_move_2_velocity,
                                   stepper_move_2_timeout, Step::run_tickler,
                                   Step::maintenance);

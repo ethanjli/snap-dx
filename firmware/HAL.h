@@ -1,3 +1,5 @@
+#pragma once
+
 #include <AccelStepper.h>  // Used by StepperMotor
 
 // The HAL classes define low-level device drivers.
@@ -159,38 +161,44 @@ class StepperMotor {
 
         enable_.deactivate();
         stepper_.setPinsInverted(false, false, true);
-        stepper_.setMaxSpeed(max_velocity * distance_resolution);
+        stepper_.setMaxSpeed(max_speed * distance_resolution);
         stepper_.setAcceleration(acceleration * distance_resolution);
         stepper_.enableOutputs();
         return true;
     }
+    // Run the driver if the move hasn't been stopped
     void update() {
-        if (remaining_estimated_displacement() == 0) {
-            stop_move();
+        if (!moving_) {
             return;
         }
 
         stepper_.run();
     }
 
-    void start_move(float displacement, float target_velocity) {
-        stepper_.setMaxSpeed(target_velocity * distance_resolution);
+    // Start a move with a signed displacement and nonnegative max speed
+    void start_move(float displacement, float target_speed) {
+        target_speed = target_speed >= 0 ? target_speed : -1 * target_speed;
+        stepper_.setMaxSpeed(target_speed * distance_resolution);
         stepper_.setAcceleration(acceleration * distance_resolution);
         target_position_ = stepper_.currentPosition() + displacement;
         stepper_.moveTo(target_position_);
         moving_ = true;
         enable_.activate();
     }
+    // Stop a move
     void stop_move() {
         moving_ = false;
         enable_.deactivate();
     }
-    long remaining_estimated_displacement() { return stepper_.distanceToGo(); }
+    // Estimate the remaining distance to move by dead reckoning
+    long remaining_displacement() { return stepper_.distanceToGo(); }
+    // Return whether the driver is trying to move
+    bool moving() { return moving_; }
 
    private:
     static const int microsteps = 16;
     static const long distance_resolution = 500 * microsteps;  // steps/mm
-    static constexpr float max_velocity = 18.29;               // mm/s
+    static constexpr float max_speed = 18.29;                  // mm/s
     static constexpr float acceleration = 10;                  // mm/s/s
 
     const uint8_t dir_pin_;
