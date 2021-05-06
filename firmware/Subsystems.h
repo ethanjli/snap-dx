@@ -118,14 +118,14 @@ class UserInterface {
     }
     // Set primary label, clear secondary label; takes C-style strings
     void label_buttons(const char *primary) {
-        Serial.print("One button: ");
+        Serial.print("Primary button: ");
         Serial.println(primary);
     }
     // Set primary & secondary labels; takes C-style strings
     void label_buttons(const char *primary, const char *secondary) {
-        Serial.print("Two buttons: ");
+        Serial.print("Primary button: ");
         Serial.print(primary);
-        Serial.print(", ");
+        Serial.print("; secondary button: ");
         Serial.println(secondary);
     }
 
