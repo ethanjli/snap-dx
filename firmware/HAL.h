@@ -11,6 +11,7 @@ class DigitalOutput {
           inactive_level_(active_low),
           active_level_(!active_low) {}
 
+    // Always returns true
     virtual bool setup() {
         pinMode(pin_, OUTPUT);
         deactivate();
@@ -32,6 +33,7 @@ class DigitalInput {
     DigitalInput(uint8_t pin, bool active_low, bool pull_up)
         : pin_(pin), active_level_(!active_low), pull_up_(pull_up) {}
 
+    // Always returns true
     bool setup() {
         if (pull_up_) {
             pinMode(pin_, INPUT_PULLUP);
@@ -51,6 +53,7 @@ class DigitalInput {
 
 class LCD {
    public:
+    // Always returns true
     bool setup() {
         Serial.begin(115200);
         return true;
@@ -69,6 +72,7 @@ class ESP32Camera {
     ESP32Camera(uint8_t input_1, uint8_t input_2)
         : input_1_(input_1, false, false), input_2_(input_2, false, false) {}
 
+    // Returns true if the ESP32 produces the expected output
     bool setup() {
         if (!input_1_.setup()) {
             return false;
@@ -106,32 +110,34 @@ class Thermistor {
     Thermistor(uint8_t sampling_pin, uint8_t reference_pin)
         : sampling_pin_(sampling_pin), reference_pin_(reference_pin) {}
 
+    // Always returns true
     bool setup() {
         analogReadResolution(12);  // Requires Arduino Due, Zero, or MKR
-        reference_value_ = analogRead(reference_pin_);
+        // TODO: we could take a reading and check if it's within an expected
+        // range (e.g. 0 deg C to 100 deg C) and return false otherwisea.
         return true;
     }
 
     float temperature() {
-        float frac = 1.0 * analogRead(sampling_pin_) / analogRead(reference_pin_);
+        float frac =
+            1.0 * analogRead(sampling_pin_) / analogRead(reference_pin_);
         // Value of the thermistor
-        float R_th = R * frac / (1 - frac); // Ohm
-        float T = 1 / (A + B * log(R_th / R_0)) - T_0; // deg C
+        float R_th = R * frac / (1 - frac);             // Ohm
+        float T = 1 / (A + B * log(R_th / R_0)) - T_0;  // deg C
 
         return T;
     }
 
    private:
     // Value of the resistor in the thermistor circuit
-    static constexpr float R = 1977;  // Ohm
-    static constexpr float A = 0.003354; // K^-1
-    static constexpr float B = 0.000289; // K^-1
-    static constexpr float R_0 = 10000; // Ohm
-    static constexpr float T_0 = 273.15; // K
+    static constexpr float R = 1977;      // Ohm
+    static constexpr float A = 0.003354;  // K^-1
+    static constexpr float B = 0.000289;  // K^-1
+    static constexpr float R_0 = 10000;   // Ohm
+    static constexpr float T_0 = 273.15;  // K
 
     const uint8_t sampling_pin_;
     const uint8_t reference_pin_;
-    int reference_value_;
 };
 
 class StepperMotor {
@@ -142,10 +148,12 @@ class StepperMotor {
           enable_(en_pin, true),
           stepper_(AccelStepper::DRIVER, step_pin_, dir_pin_) {}
 
+    // Should always return true
     bool setup() {
         pinMode(dir_pin_, OUTPUT);
         pinMode(step_pin_, OUTPUT);
         if (!enable_.setup()) {
+            // Should never happen
             return false;
         }
 

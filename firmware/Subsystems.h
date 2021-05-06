@@ -17,6 +17,7 @@ class DebouncedSwitch {
     DebouncedSwitch(uint8_t pin, bool active_low, bool pull_up)
         : button_(pin, active_low, pull_up) {}
 
+    // Should always return true
     bool setup() { return button_.setup(); }
     // Sample the switch and apply debouncing.
     void update() {
@@ -84,16 +85,21 @@ class UserInterface {
                     true /* TODO: is button low when pressed? */,
                     true /* TODO: pullup input? */) {}
 
+    // Should always return true
     bool setup() {
         if (!primary.setup()) {
+            // Should never happen
             return false;
         }
 
         if (!secondary.setup()) {
+            // Should never happen
             return false;
         }
 
         if (!display_.setup()) {
+            // Should never happen, at least for the current mock of the LCD
+            // screen which just initializes Serial
             return false;
         }
 
@@ -113,9 +119,7 @@ class UserInterface {
     }
 
     // Clear button labels
-    void label_buttons() {
-        Serial.println("No buttons!");
-    }
+    void label_buttons() { Serial.println("No buttons!"); }
     // Set primary label, clear secondary label; takes C-style strings
     void label_buttons(const char *primary) {
         Serial.print("Primary button: ");
@@ -145,12 +149,17 @@ class ThermalController {
           thermistor(thermistor_sampler, thermistor_reference),
           control_loop_(pulse_on_max_duration, pulse_off_duration) {}
 
+    // Should always return true
     bool setup() {
         if (!thermistor.setup()) {
+            // Should never happen, at least for the current implementation of
+            // thermistor which doesn't check if it gives a nonsensical reading
+            // upon startup
             return false;
         }
 
         if (!heater_.setup()) {
+            // Should never happen
             return false;
         }
 
@@ -180,7 +189,8 @@ class ThermalController {
     static const unsigned long update_interval = 500;  // ms
 
     DigitalOutput heater_;
-    TemperatureControlLoop control_loop_;  // like bang-bang with a constant duty cycle
+    TemperatureControlLoop
+        control_loop_;  // like bang-bang with a constant duty cycle
     float temperature_ = 0;
     unsigned long last_measurement_time_ = 0;
 };
@@ -198,16 +208,20 @@ class MotionController {
           switch_bottom(switch_bottom, true /* TODO: low when pressed? */,
                         true /* TODO: pullup input? */) {}
 
+    // Returns false if unable to go to home position (bottom limit)
     bool setup() {
         if (!switch_top.setup()) {
+            // Should never happen
             return false;
         }
 
         if (!switch_bottom.setup()) {
+            // Should never happen
             return false;
         }
 
         if (!stepper_.setup()) {
+            // Should never happen
             return false;
         }
 
@@ -284,12 +298,16 @@ class Door {
           lock_switch_(lock_switch,
                        true /* TODO: is switch low when pressed? */,
                        true /* TODO: pullup input? */) {}
+
+    // Returns false if the door is open
     bool setup() {
         if (!solenoid_.setup()) {
+            // Should never happen
             return false;
         }
 
         if (!lock_switch_.setup()) {
+            // Should never happen
             return false;
         }
 
