@@ -96,6 +96,8 @@ class UserInterface {
         if (!display_.setup()) {
             return false;
         }
+
+        return true;
     }
     void update() {
         primary.update();
@@ -106,20 +108,25 @@ class UserInterface {
     // Messages may be up to ??? characters long; beyond that, they'll
     // need to be animated (e.g. in a marquee style)
     void print_message(const char *message) {
-        // TODO
+        Serial.print("Message: ");
+        Serial.println(message);
     }
 
     // Clear button labels
     void label_buttons() {
-        // TODO
+        Serial.println("No buttons!");
     }
     // Set primary label, clear secondary label; takes C-style strings
     void label_buttons(const char *primary) {
-        // TODO
+        Serial.print("One button: ");
+        Serial.println(primary);
     }
     // Set primary & secondary labels; takes C-style strings
     void label_buttons(const char *primary, const char *secondary) {
-        // TODO
+        Serial.print("Two buttons: ");
+        Serial.print(primary);
+        Serial.print(", ");
+        Serial.println(secondary);
     }
 
    private:

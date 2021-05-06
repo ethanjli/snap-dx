@@ -8,8 +8,7 @@
 class InstantDx {
    public:
     InstantDx()
-        : user_interface(0 /* TODO: primary button pin? */,
-                         0 /* TODO: secondary button pin? */),
+        : user_interface(51, 53),
           camera(0 /* TODO: pin 1? */, 0 /* TODO: pin 2? */),
           thermal_controller_1(44, A1, A0, 1000 * 10, 1000 * 20),
           thermal_controller_2(42, A2, A0, 1000 * 5, 1000 * 5),
@@ -37,7 +36,7 @@ class InstantDx {
             return false;
         }
         user_interface.print_message("Initializing...");
-        if (!camera.setup()) {
+        /*if (!camera.setup()) {
             return false;
         }
 
@@ -64,7 +63,7 @@ class InstantDx {
 
         if (!door.setup()) {
             return false;
-        }
+        }*/
 
         return true;
     }

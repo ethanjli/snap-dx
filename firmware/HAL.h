@@ -51,7 +51,10 @@ class DigitalInput {
 
 class LCD {
    public:
-    bool setup() {}
+    bool setup() {
+        Serial.begin(115200);
+        return true;
+    }
 };
 
 class ESP32Camera {

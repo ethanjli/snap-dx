@@ -194,14 +194,17 @@ void loop() {
             procedure.go(Step::initialize);
             return;
         case Step::initialize:
-            if (!instant_dx.await_initialize()) {
-                instant_dx.await_unlock(door_unlock_time);  // do we actually want to unlock?
-                instant_dx.user_interface.print_message(
-                    "Initialization failed!");
-                instant_dx.user_interface.label_buttons("Ok");
-                instant_dx.await_tap(instant_dx.user_interface.primary);
-                procedure.go(Step::maintenance);
+            if (instant_dx.await_initialize()) {
+                procedure.go(Step::standby);
+                return;
             }
+
+            instant_dx.await_unlock(door_unlock_time);  // do we actually want to unlock?
+            instant_dx.user_interface.print_message(
+                "Initialization failed!");
+            instant_dx.user_interface.label_buttons("Ok");
+            instant_dx.await_tap(instant_dx.user_interface.primary);
+            procedure.go(Step::maintenance);
             return;
         case Step::standby:
             instant_dx.user_interface.print_message("InstantDx - v?.?.?");
