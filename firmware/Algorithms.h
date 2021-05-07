@@ -58,7 +58,7 @@ class TemperatureControlLoop {
 
 class Debouncer {
    public:
-    enum class Status { ok = 0, waiting, unstable };
+    enum class Status : uint8_t { ok = 0, waiting, unstable };
 
     Debouncer() = default;
     // Return debounced signal from input signal
@@ -101,13 +101,13 @@ class Debouncer {
     unsigned long last_sample_time_ = 0;                    // ms
     uint8_t integrator_ = 0;
     unsigned long last_time_stable_ = 0;  // ms
-    const uint8_t max_integrator_samples = 100;
+    const uint8_t max_integrator_samples = 20;
     bool output_ = false;
 };
 
 class EdgeDetector {
    public:
-    enum class State {
+    enum class State : uint8_t {
         no_edge = 0,  // Button is in stable state
         rising_edge,  // Button triggered on rising edge
         falling_edge  // Button triggered on falling edge

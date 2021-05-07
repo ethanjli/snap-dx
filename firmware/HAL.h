@@ -45,7 +45,7 @@ class DigitalInput {
         return true;
     }
 
-    bool is_active() { digitalRead(pin_) == active_level_; }
+    bool is_active() { return digitalRead(pin_) == active_level_; }
 
    private:
     const uint8_t pin_;
@@ -56,10 +56,7 @@ class DigitalInput {
 class LCD {
    public:
     // Always returns true
-    bool setup() {
-        Serial.begin(115200);
-        return true;
-    }
+    bool setup() { return true; }
 };
 
 class ESP32Camera {

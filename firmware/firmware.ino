@@ -46,8 +46,9 @@ class Procedure {
     // Change which step the procedure is on.
     void go(Step step) {
         step_ = step;
-        Serial.print("DEBUG: procedure going to step ");
-        Serial.println(static_cast<uint16_t>(step_));
+        SerialUSB.print("Procedure.go(");
+        SerialUSB.print(static_cast<uint16_t>(step_));
+        SerialUSB.println(")");
     }
 
     // Wait for a single button press-and-release, then change the step of the
@@ -59,7 +60,7 @@ class Procedure {
         const char *secondary_label,
         Step secondary) {
         instant_dx.user_interface.label_buttons(primary_label, secondary_label);
-        switch (instant_dx.await_tap()) {
+        switch (instant_dx.await_press()) {
             case UserInterface::ButtonsState::primary:
                 go(primary);
                 return;
@@ -83,7 +84,7 @@ class Procedure {
         instant_dx.user_interface.print_message(
             "Error. Door not fully closed.");
         instant_dx.user_interface.label_buttons("Back");
-        instant_dx.await_tap(instant_dx.user_interface.primary);
+        instant_dx.await_press(instant_dx.user_interface.primary);
         go(retry_step);
     }
 
@@ -199,10 +200,13 @@ ESP32Camera::Result test_result = ESP32Camera::Result::invalid;
 
 // Main function
 
-// setup() is probably not needed, but this is where we'd set up the Serial
-// connection for debugging. Setup of other devices would happen in the setup
-// methods for the corresponding devices in HAL.h
-void setup() {}
+void setup() {
+    SerialUSB.begin(115200);
+    while (!SerialUSB) {
+        ;  // wait for serial port to connect; needed for native USB port
+    }
+    SerialUSB.println("DEBUG CONSOLE");
+}
 
 // Each time loop is called, it checks the procedure object to determine the
 // current step of the procedure, executes the work defined for that step,
@@ -231,19 +235,19 @@ void loop() {
                 door_unlock_time);  // do we actually want to unlock?
             instant_dx.user_interface.print_message("Initialization failed!");
             instant_dx.user_interface.label_buttons("Ok");
-            instant_dx.await_tap(instant_dx.user_interface.primary);
+            instant_dx.await_press(instant_dx.user_interface.primary);
             procedure.go(Step::maintenance);
             return;
         case Step::standby:
             instant_dx.user_interface.print_message("InstantDx - v?.?.?");
             instant_dx.user_interface.label_buttons("New Test");
-            instant_dx.await_tap(instant_dx.user_interface.primary);
-            instant_dx.user_interface.print_message("DEBUG: Cooling down...");
+            instant_dx.await_press(instant_dx.user_interface.primary);
+            SerialUSB.println("Step::standby: Cooling down...");
             procedure.go_try_cooldown(
                 instant_dx, Step::load_insert, Step::maintenance);
             return;
         case Step::load_insert:
-            instant_dx.user_interface.print_message("DEBUG: Unlocking door...");
+            SerialUSB.println("Step::load_insert: Unlocking door...");
             instant_dx.await_unlock(door_unlock_time);
             instant_dx.user_interface.print_message("Open and insert");
             procedure.go_on_button(
@@ -321,7 +325,7 @@ void loop() {
                     break;
             }
             instant_dx.user_interface.label_buttons("Ok");
-            instant_dx.await_tap(instant_dx.user_interface.primary);
+            instant_dx.await_press(instant_dx.user_interface.primary);
             procedure.go_try_cooldown(
                 instant_dx, Step::unload_open, Step::maintenance);
             return;

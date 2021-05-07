@@ -13,16 +13,18 @@ bool past_timeout(unsigned long previous_time, unsigned long timeout) {
 
 class DebouncedSwitch {
    public:
-    enum class State {
-        bouncing,     // switch is transitioning between active and inactive
-        deactivated,  // switch was just deactivated in the last read
-        inactive,     // switch was deactivated before the last read
-        activated,    // switch was just activated down in the last read
-        active        // switch was activated down before the last read
+    enum class State : uint8_t {
+        bouncing = 255,  // switch is transitioning between active and inactive
+        inactive = 0,    // switch was deactivated before the last read
+        deactivated,     // switch was just deactivated in the last read
+        activated,       // switch was just activated down in the last read
+        active           // switch was activated down before the last read
     };
 
+    const uint8_t pin;  // only for debugging
+
     DebouncedSwitch(uint8_t pin, bool active_low, bool pull_up)
-        : button_(pin, active_low, pull_up) {}
+        : pin(pin), button_(pin, active_low, pull_up) {}
 
     // Should always return true
     bool setup() { return button_.setup(); }
@@ -34,6 +36,11 @@ class DebouncedSwitch {
             case Debouncer::Status::ok:
                 break;
             case Debouncer::Status::unstable:
+                if (state_ != State::bouncing) {
+                    SerialUSB.print("DebouncedSwitch(");
+                    SerialUSB.print(pin);
+                    SerialUSB.println(").update: bouncing too much!");
+                }
                 state_ = State::bouncing;
                 return;
             default:
@@ -43,12 +50,20 @@ class DebouncedSwitch {
         EdgeDetector::State state;
         edge_detector_.transform(debounced, state);
         switch (state) {
-            case EdgeDetector::State::no_edge:
-                break;
             case EdgeDetector::State::rising_edge:
+                SerialUSB.print("DebouncedSwitch(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").update: activated!");
                 state_ = State::activated;
+                break;
             case EdgeDetector::State::falling_edge:
+                SerialUSB.print("DebouncedSwitch(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").update: deactivated!");
                 state_ = State::deactivated;
+                break;
+            default:
+                break;
         }
     }
     State getState() { return state_; }
@@ -60,9 +75,15 @@ class DebouncedSwitch {
         State current_state = state_;
         switch (state_) {
             case State::activated:
+                // SerialUSB.print("DebouncedSwitch(");
+                // SerialUSB.print(pin);
+                // SerialUSB.println(").read: consumed activation!");
                 state_ = State::active;
                 break;
             case State::deactivated:
+                // SerialUSB.print("DebouncedSwitch(");
+                // SerialUSB.print(pin);
+                // SerialUSB.println(").read: consumed deactivation!");
                 state_ = State::inactive;
                 break;
             default:
@@ -80,20 +101,14 @@ class DebouncedSwitch {
 
 class UserInterface {
    public:
-    enum class ButtonsState { primary, secondary, both, neither };
+    enum class ButtonsState : uint8_t { primary = 0, secondary, both, neither };
 
     DebouncedSwitch primary;
     DebouncedSwitch secondary;
 
     UserInterface(uint8_t primary_button, uint8_t secondary_button)
-        : primary(
-              primary_button,
-              true /* TODO: is button low when pressed? */,
-              true /* TODO: pullup input? */),
-          secondary(
-              secondary_button,
-              true /* TODO: is button low when pressed? */,
-              true /* TODO: pullup input? */) {}
+        : primary(primary_button, true, true),
+          secondary(secondary_button, true, true) {}
 
     // Should always return true
     bool setup() {
@@ -124,23 +139,35 @@ class UserInterface {
     // Messages may be up to ??? characters long; beyond that, they'll
     // need to be animated (e.g. in a marquee style)
     void print_message(const char *message) {
-        Serial.print("Message: ");
-        Serial.println(message);
+        SerialUSB.print("----------------------------------------");
+        SerialUSB.print("----------------------------------------> [ ");
+        SerialUSB.print(message);
+        SerialUSB.println(" ]");
     }
 
     // Clear button labels
-    void label_buttons() { Serial.println("No buttons!"); }
+    void label_buttons() {
+        SerialUSB.print("----------------------------------------");
+        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.println("( -- | -- )");
+    }
     // Set primary label, clear secondary label; takes C-style strings
     void label_buttons(const char *primary) {
-        Serial.print("Primary button: ");
-        Serial.println(primary);
+        SerialUSB.print("----------------------------------------");
+        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.print("( ");
+        SerialUSB.print(primary);
+        SerialUSB.println(" | -- )");
     }
     // Set primary & secondary labels; takes C-style strings
     void label_buttons(const char *primary, const char *secondary) {
-        Serial.print("Primary button: ");
-        Serial.print(primary);
-        Serial.print("; secondary button: ");
-        Serial.println(secondary);
+        SerialUSB.print("----------------------------------------");
+        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.print("( ");
+        SerialUSB.print(primary);
+        SerialUSB.print(" | ");
+        SerialUSB.print(secondary);
+        SerialUSB.println(" )");
     }
 
    private:

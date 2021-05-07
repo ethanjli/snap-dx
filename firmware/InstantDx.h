@@ -39,6 +39,7 @@ class InstantDx {
             return false;
         }
         user_interface.print_message("Initializing...");
+        user_interface.label_buttons();
         /*if (!camera.setup()) {
             return false;
         }*/
@@ -85,54 +86,47 @@ class InstantDx {
     }
 
     // Wait for the specified button to be pressed and then released.
-    void await_tap(DebouncedSwitch &button) {
+    void await_press(DebouncedSwitch &button) {
         using Event = DebouncedSwitch::State;
 
         // Discard previous press/release events
         button.read();
-        // Track button press/release events
-        bool button_activated = false;
         while (true) {
             background_update();  // updates button debouncing
 
-            if (!button_activated && button.read() == Event::activated) {
-                button_activated = true;
-            } else if (
-                button_activated && button.read() == Event::deactivated) {
+            if (button.read() == Event::activated) {
+                SerialUSB.print("InstantDx.await_press(");
+                if (user_interface.primary.pin == button.pin) {
+                    SerialUSB.print("primary");
+                } else if (user_interface.secondary.pin == button.pin) {
+                    SerialUSB.print("secondary");
+                } else {
+                    SerialUSB.print(button.pin);
+                }
+                SerialUSB.println("): pressed!");
                 return;
             }
         }
     }
-    // Wait for a single button to be pressed and released. Return value
-    // describes which button was pressed and released - either primary or
-    // secondary. Will not return both/neither; if both were simultaneously
-    // released after both being pressed, primary button has priority.
-    UserInterface::ButtonsState await_tap() {
+    // Wait for a single button to be pressed. Return value describes which
+    // button was pressed - either primary or secondary. Will not return
+    // both/neither; if both were simultaneously pressed, primary button has
+    // priority.
+    UserInterface::ButtonsState await_press() {
         using Event = DebouncedSwitch::State;
         using ButtonsState = UserInterface::ButtonsState;
 
         // Discard previous press/release events
         user_interface.primary.read();
         user_interface.secondary.read();
-        // Track button press/release events
-        bool primary_activated = false;
-        bool secondary_activated = false;
         while (true) {
             background_update();  // updates button debouncing
-            if (!primary_activated &&
-                user_interface.primary.read() == Event::activated) {
-                primary_activated = true;
-            } else if (
-                primary_activated &&
-                user_interface.primary.read() == Event::deactivated) {
+            if (user_interface.primary.read() == Event::activated) {
+                SerialUSB.println("InstantDx.await_press: primary pressed!");
                 return ButtonsState::primary;
             }
-            if (!secondary_activated &&
-                user_interface.secondary.read() == Event::activated) {
-                secondary_activated = true;
-            } else if (
-                secondary_activated &&
-                user_interface.secondary.read() == Event::deactivated) {
+            if (user_interface.secondary.read() == Event::activated) {
+                SerialUSB.println("InstantDx.await_press: secondary pressed!");
                 return ButtonsState::secondary;
             }
         }
