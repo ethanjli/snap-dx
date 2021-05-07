@@ -86,11 +86,14 @@ class UserInterface {
     DebouncedSwitch secondary;
 
     UserInterface(uint8_t primary_button, uint8_t secondary_button)
-        : primary(primary_button, true /* TODO: is button low when pressed? */,
-                  true /* TODO: pullup input? */),
-          secondary(secondary_button,
-                    true /* TODO: is button low when pressed? */,
-                    true /* TODO: pullup input? */) {}
+        : primary(
+              primary_button,
+              true /* TODO: is button low when pressed? */,
+              true /* TODO: pullup input? */),
+          secondary(
+              secondary_button,
+              true /* TODO: is button low when pressed? */,
+              true /* TODO: pullup input? */) {}
 
     // Should always return true
     bool setup() {
@@ -148,10 +151,12 @@ class ThermalController {
    public:
     Thermistor thermistor;
 
-    ThermalController(uint8_t heater, uint8_t thermistor_sampler,
-                      uint8_t thermistor_reference,
-                      unsigned long pulse_on_max_duration,
-                      unsigned long pulse_off_duration)
+    ThermalController(
+        uint8_t heater,
+        uint8_t thermistor_sampler,
+        uint8_t thermistor_reference,
+        unsigned long pulse_on_max_duration,
+        unsigned long pulse_off_duration)
         : heater_(heater, true),
           thermistor(thermistor_sampler, thermistor_reference),
           control_loop_(pulse_on_max_duration, pulse_off_duration) {}
@@ -206,13 +211,21 @@ class MotionController {
     DebouncedSwitch switch_top;
     DebouncedSwitch switch_bottom;
 
-    MotionController(uint8_t dir, uint8_t step, uint8_t en, uint8_t switch_top,
-                     uint8_t switch_bottom)
+    MotionController(
+        uint8_t dir,
+        uint8_t step,
+        uint8_t en,
+        uint8_t switch_top,
+        uint8_t switch_bottom)
         : stepper_(dir, step, en),
-          switch_top(switch_top, true /* TODO: low when pressed? */,
-                     true /* TODO: pullup input? */),
-          switch_bottom(switch_bottom, true /* TODO: low when pressed? */,
-                        true /* TODO: pullup input? */) {}
+          switch_top(
+              switch_top,
+              true /* TODO: low when pressed? */,
+              true /* TODO: pullup input? */),
+          switch_bottom(
+              switch_bottom,
+              true /* TODO: low when pressed? */,
+              true /* TODO: pullup input? */) {}
 
     // Returns false if unable to go to home position (bottom limit)
     bool setup() {
@@ -310,9 +323,10 @@ class Door {
    public:
     Door(uint8_t solenoid, uint8_t lock_switch)
         : solenoid_(solenoid, true),
-          lock_switch_(lock_switch,
-                       true /* TODO: is switch low when pressed? */,
-                       true /* TODO: pullup input? */) {}
+          lock_switch_(
+              lock_switch,
+              true /* TODO: is switch low when pressed? */,
+              true /* TODO: pullup input? */) {}
 
     // Returns false if the door is open
     bool setup() {

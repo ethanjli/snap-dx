@@ -4,8 +4,8 @@
 
 class TemperatureControlLoop {
    public:
-    TemperatureControlLoop(unsigned long pulse_on_max_duration,
-                           unsigned long pulse_off_duration)
+    TemperatureControlLoop(
+        unsigned long pulse_on_max_duration, unsigned long pulse_off_duration)
         : pulse_on_max_duration(pulse_on_max_duration),
           pulse_off_duration(pulse_off_duration) {}
 
@@ -16,8 +16,8 @@ class TemperatureControlLoop {
         }
 
         if (pulse_on_) {
-            if (past_timeout(current_time, pulse_on_start_,
-                             pulse_on_max_duration) ||
+            if (past_timeout(
+                    current_time, pulse_on_start_, pulse_on_max_duration) ||
                 temperature > setpoint_) {
                 pulse_on_ = false;
                 pulse_off_start_ = current_time;
@@ -86,8 +86,8 @@ class Debouncer {
                                                    // integrator got corrupted
         }
         // Report switch fault if debounce time exceeds the maximum limit
-        if (past_timeout(current_time, last_time_stable_,
-                         debounce_time_limit)) {
+        if (past_timeout(
+                current_time, last_time_stable_, debounce_time_limit)) {
             return Status::unstable;
         }
         output = output_;

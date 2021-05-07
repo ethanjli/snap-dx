@@ -97,8 +97,8 @@ class InstantDx {
 
             if (!button_activated && button.read() == Event::activated) {
                 button_activated = true;
-            } else if (button_activated &&
-                       button.read() == Event::deactivated) {
+            } else if (
+                button_activated && button.read() == Event::deactivated) {
                 return;
             }
         }
@@ -122,23 +122,27 @@ class InstantDx {
             if (!primary_activated &&
                 user_interface.primary.read() == Event::activated) {
                 primary_activated = true;
-            } else if (primary_activated &&
-                       user_interface.primary.read() == Event::deactivated) {
+            } else if (
+                primary_activated &&
+                user_interface.primary.read() == Event::deactivated) {
                 return ButtonsState::primary;
             }
             if (!secondary_activated &&
                 user_interface.secondary.read() == Event::activated) {
                 secondary_activated = true;
-            } else if (secondary_activated &&
-                       user_interface.secondary.read() == Event::deactivated) {
+            } else if (
+                secondary_activated &&
+                user_interface.secondary.read() == Event::deactivated) {
                 return ButtonsState::secondary;
             }
         }
     }
 
     // Wait for heater to warm up past the threshold
-    bool await_thermal_warmup(ThermalController &thermal_controller,
-                              float threshold, unsigned long timeout) {
+    bool await_thermal_warmup(
+        ThermalController &thermal_controller,
+        float threshold,
+        unsigned long timeout) {
         thermal_controller.start_control(threshold);
         const unsigned long start_time = millis();
         while (true) {
@@ -190,8 +194,8 @@ class InstantDx {
     // Wait for the specified displacement movement to complete (successfully or
     // unsuccessfully), but give up as a failure if it's not finished within a
     // timeout, or if it was cancelled by a limit switch.
-    bool await_move(float displacement, float target_speed,
-                    unsigned long timeout) {
+    bool await_move(
+        float displacement, float target_speed, unsigned long timeout) {
         const unsigned long start_time = millis();
         motion_controller.start_move(displacement, target_speed);
         // background_update always runs at least once.
