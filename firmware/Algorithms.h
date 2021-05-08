@@ -16,11 +16,22 @@ class TemperatureControlLoop {
         }
 
         if (pulse_on_) {
-            if (past_timeout(
-                    current_time, pulse_on_start_, pulse_on_max_duration) ||
-                temperature > setpoint_) {
+           bool on_completed = past_timeout(
+                    current_time, pulse_on_start_, pulse_on_max_duration);
+            if (on_completed || temperature > setpoint_) {
                 pulse_on_ = false;
                 pulse_off_start_ = current_time;
+                if (on_completed) {
+                   SerialUSB.print("    TemperatureControlLoop.update(");
+                   SerialUSB.print(temperature);
+                   SerialUSB.println(" deg C): completed full ON pulse!");
+                } else {
+                   SerialUSB.print("    TemperatureControlLoop.update(");
+                   SerialUSB.print(temperature);
+                   SerialUSB.print(" deg C): ended ON pulse early with duration of ");
+                   SerialUSB.print(current_time - pulse_on_start_);
+                   SerialUSB.println(" ms!");
+                }
                 return false;
             } else {
                 return true;
@@ -28,6 +39,9 @@ class TemperatureControlLoop {
         }
 
         if (past_timeout(current_time, pulse_off_start_, pulse_off_duration)) {
+           SerialUSB.print("    TemperatureControlLoop.update(");
+           SerialUSB.print(temperature);
+           SerialUSB.println(" deg C): completed full OFF pulse!");
             pulse_on_ = true;
             pulse_on_start_ = current_time;
             return true;

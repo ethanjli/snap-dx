@@ -112,8 +112,16 @@ class Thermistor {
     // Always returns true
     bool setup() {
         analogReadResolution(12);  // Requires Arduino Due, Zero, or MKR
-        // TODO: we could take a reading and check if it's within an expected
-        // range (e.g. 0 deg C to 100 deg C) and return false otherwisea.
+        float reading = temperature();
+        SerialUSB.print("    Thermistor(");
+        SerialUSB.print(sampling_pin_);
+        SerialUSB.print(").setup: ");
+        SerialUSB.print(reading);
+        SerialUSB.println(" deg C!");
+        if (reading < 15 || reading > 130) {  // deg C
+            return false;
+        }
+
         return true;
     }
 

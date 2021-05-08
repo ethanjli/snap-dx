@@ -21,7 +21,7 @@ class DebouncedSwitch {
         active           // switch was activated down before the last read
     };
 
-    const uint8_t pin;  // only for debugging
+    const uint8_t pin;
 
     DebouncedSwitch(uint8_t pin, bool active_low, bool pull_up)
         : pin(pin), button_(pin, active_low, pull_up) {}
@@ -37,7 +37,7 @@ class DebouncedSwitch {
                 break;
             case Debouncer::Status::unstable:
                 if (state_ != State::bouncing) {
-                    SerialUSB.print("DebouncedSwitch(");
+                    SerialUSB.print("    DebouncedSwitch(");
                     SerialUSB.print(pin);
                     SerialUSB.println(").update: bouncing too much!");
                 }
@@ -51,13 +51,13 @@ class DebouncedSwitch {
         edge_detector_.transform(debounced, state);
         switch (state) {
             case EdgeDetector::State::rising_edge:
-                SerialUSB.print("DebouncedSwitch(");
+                SerialUSB.print("    DebouncedSwitch(");
                 SerialUSB.print(pin);
                 SerialUSB.println(").update: activated!");
                 state_ = State::activated;
                 break;
             case EdgeDetector::State::falling_edge:
-                SerialUSB.print("DebouncedSwitch(");
+                SerialUSB.print("    DebouncedSwitch(");
                 SerialUSB.print(pin);
                 SerialUSB.println(").update: deactivated!");
                 state_ = State::deactivated;
@@ -75,15 +75,15 @@ class DebouncedSwitch {
         State current_state = state_;
         switch (state_) {
             case State::activated:
-                // SerialUSB.print("DebouncedSwitch(");
-                // SerialUSB.print(pin);
-                // SerialUSB.println(").read: consumed activation!");
+                SerialUSB.print("    DebouncedSwitch(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").read: consumed activation!");
                 state_ = State::active;
                 break;
             case State::deactivated:
-                // SerialUSB.print("DebouncedSwitch(");
-                // SerialUSB.print(pin);
-                // SerialUSB.println(").read: consumed deactivation!");
+                SerialUSB.print("    DebouncedSwitch(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").read: consumed deactivation!");
                 state_ = State::inactive;
                 break;
             default:
@@ -139,43 +139,75 @@ class UserInterface {
     // Messages may be up to ??? characters long; beyond that, they'll
     // need to be animated (e.g. in a marquee style)
     void print_message(const char *message) {
-        SerialUSB.print("----------------------------------------");
-        SerialUSB.print("----------------------------------------> [ ");
+        SerialUSB.print(log_prefix);
+        SerialUSB.print(message_prefix);
         SerialUSB.print(message);
-        SerialUSB.println(" ]");
+        SerialUSB.println(message_postfix);
     }
 
     // Clear button labels
     void label_buttons() {
-        SerialUSB.print("----------------------------------------");
-        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.print(log_prefix);
+#ifdef DEBUG_MODE
         SerialUSB.println("( -- | -- )");
+#else
+        SerialUSB.print(buttons_prefix);
+        SerialUSB.println("()");
+#endif
     }
     // Set primary label, clear secondary label; takes C-style strings
     void label_buttons(const char *primary) {
-        SerialUSB.print("----------------------------------------");
-        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.print(log_prefix);
+#ifdef DEBUG_MODE
         SerialUSB.print("( ");
         SerialUSB.print(primary);
         SerialUSB.println(" | -- )");
+#else
+        SerialUSB.print(buttons_prefix);
+        SerialUSB.print("(");
+        SerialUSB.print(primary);
+        SerialUSB.println(")");
+#endif
     }
     // Set primary & secondary labels; takes C-style strings
     void label_buttons(const char *primary, const char *secondary) {
-        SerialUSB.print("----------------------------------------");
-        SerialUSB.print("----------------------------------------- ");
+        SerialUSB.print(log_prefix);
+#ifdef DEBUG_MODE
         SerialUSB.print("( ");
         SerialUSB.print(primary);
         SerialUSB.print(" | ");
         SerialUSB.print(secondary);
         SerialUSB.println(" )");
+#else
+        SerialUSB.print(buttons_prefix);
+        SerialUSB.print("(");
+        SerialUSB.print(primary);
+        SerialUSB.print(", ");
+        SerialUSB.print(secondary);
+        SerialUSB.println(")");
+#endif
     }
 
    private:
     LCD display_;
+#ifdef DEBUG_MODE
+    const char *log_prefix =
+        "----------------------------------------------------------------------"
+        "----------> ";
+    const char *message_prefix = "[ ";
+    const char *message_postfix = " ]";
+    const char *buttons_prefix = "";
+#else
+    const char *log_prefix = "    UserInterface";
+    const char *message_prefix = ".print_message(";
+    const char *message_postfix = ")";
+    const char *buttons_prefix = ".label_buttons";
+#endif
 };
 
 class ThermalController {
    public:
+    const uint8_t pin;
     Thermistor thermistor;
 
     ThermalController(
@@ -184,8 +216,9 @@ class ThermalController {
         uint8_t thermistor_reference,
         unsigned long pulse_on_max_duration,
         unsigned long pulse_off_duration)
-        : heater_(heater, true),
+        : pin(heater),
           thermistor(thermistor_sampler, thermistor_reference),
+          heater_(heater, true),
           control_loop_(pulse_on_max_duration, pulse_off_duration) {}
 
     // Should always return true. Initializes the heater as deactivated.
@@ -216,10 +249,18 @@ class ThermalController {
 
     // Start controlling the heater. Returns immediately.
     void start_control(float setpoint) {
+        SerialUSB.print("    ThermalController(");
+        SerialUSB.print(pin);
+        SerialUSB.print(").start_control(");
+        SerialUSB.print(setpoint);
+        SerialUSB.println(" deg C)");
         control_loop_.start_control(setpoint);
     }
     // Stop controlling the heater, and turn it off. Returns immediately.
     void stop_control() {
+        SerialUSB.print("    ThermalController(");
+        SerialUSB.print(pin);
+        SerialUSB.println(").stop_control");
         control_loop_.stop_control();
         heater_.deactivate();
     }
@@ -235,6 +276,7 @@ class ThermalController {
 
 class MotionController {
    public:
+    const uint8_t pin;
     DebouncedSwitch switch_top;
     DebouncedSwitch switch_bottom;
 
@@ -244,7 +286,7 @@ class MotionController {
         uint8_t en,
         uint8_t switch_top,
         uint8_t switch_bottom)
-        : stepper_(dir, step, en),
+        : pin(en),
           switch_top(
               switch_top,
               true /* TODO: low when pressed? */,
@@ -252,7 +294,8 @@ class MotionController {
           switch_bottom(
               switch_bottom,
               true /* TODO: low when pressed? */,
-              true /* TODO: pullup input? */) {}
+              true /* TODO: pullup input? */),
+          stepper_(dir, step, en) {}
 
     // Returns false if unable to go to home position (bottom limit)
     bool setup() {
@@ -272,6 +315,9 @@ class MotionController {
         }
 
         // Try to go to home position (bottom limit)
+        SerialUSB.print("    MotionController(");
+        SerialUSB.print(pin);
+        SerialUSB.println(").setup: moving home...");
         const float move_speed = 5;                   // mm/s
         const unsigned long move_timeout = 5 * 1000;  // timeout of 5 sec
         start_move(-1 * move_speed);                  // move to the bottom
@@ -279,10 +325,16 @@ class MotionController {
         while (true) {
             update();
             if (switch_bottom.read() == DebouncedSwitch::State::active) {
+                SerialUSB.print("    MotionController(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").setup: completed!");
                 return true;
             }
 
             if (past_timeout(start_time, move_timeout)) {
+                SerialUSB.print("    MotionController(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").setup: timed out!");
                 return false;
             }
         }
@@ -295,11 +347,27 @@ class MotionController {
         switch_bottom.update();
         if (moved_into_top_limit() || moved_into_bottom_limit()) {
             // Cancel the move to prevent a stall
+            SerialUSB.print("    MotionController(");
+            SerialUSB.print(pin);
+            SerialUSB.print(").update: reached ");
+            if (moved_into_top_limit() && moved_into_bottom_limit()) {
+                SerialUSB.print("both limits");
+            } else if (moved_into_top_limit()) {
+                SerialUSB.print("top limit");
+            } else if (moved_into_bottom_limit()) {
+                SerialUSB.print("bottom limit");
+            }
+            SerialUSB.println("!");
             stepper_.stop_move();
         }
         if (stepper_.remaining_displacement() == 0) {
             // Record that the move has finished
-            stepper_.stop_move();
+            if (stepper_.moving()) {
+                SerialUSB.print("    MotionController(");
+                SerialUSB.print(pin);
+                SerialUSB.println(").update: finished displacement!");
+                stepper_.stop_move();
+            }
         }
         stepper_.update();
     }
@@ -308,6 +376,13 @@ class MotionController {
     // A positive displacement moves the motor up, a negative velocity moves it
     // down. Speed should always be positive. Returns instantly.
     void start_move(float displacement, float target_speed) {
+        SerialUSB.print("    MotionController(");
+        SerialUSB.print(pin);
+        SerialUSB.print(").start_move(");
+        SerialUSB.print(displacement);
+        SerialUSB.print(" mm, ");
+        SerialUSB.print(target_speed);
+        SerialUSB.println(" mm/s)");
         stepper_.start_move(displacement, target_speed);
     }
     // Start a move at the given velocity. A positive velocity moves the
@@ -316,10 +391,24 @@ class MotionController {
         float direction = target_velocity >= 0 ? 1 : -1;
         float target_speed =
             target_velocity >= 0 ? target_velocity : -1 * target_velocity;
+        SerialUSB.print("    MotionController(");
+        SerialUSB.print(pin);
+        SerialUSB.print(").start_move(");
+        SerialUSB.print(direction > 0 ? "up" : "down");
+        SerialUSB.print(", ");
+        SerialUSB.print(target_speed);
+        SerialUSB.println(" mm/s)");
         stepper_.start_move(direction * indefinite_displacement, target_speed);
     }
     // Return whether the motion controller is in the middle of a move
     bool moving() { return stepper_.moving(); }
+    // Cancel any ongoing move
+    void cancel_move() {
+        SerialUSB.print("    MotionController(");
+        SerialUSB.print(pin);
+        SerialUSB.print(").cancel_move");
+        stepper_.stop_move();
+    }
 
     // Return whether the top limit switch interrupted the most recent move
     bool moved_into_top_limit() {
@@ -348,8 +437,11 @@ class MotionController {
 
 class Door {
    public:
+    const uint8_t pin;
+
     Door(uint8_t solenoid, uint8_t lock_switch)
-        : solenoid_(solenoid, true),
+        : pin(solenoid),
+          solenoid_(solenoid, true),
           lock_switch_(
               lock_switch,
               true /* TODO: is switch low when pressed? */,
@@ -371,8 +463,14 @@ class Door {
             start_lock();
             // TODO: do we actually need to try to lock the door as part of
             // setup? Shouldn't the door naturally be locked by default?
+            SerialUSB.print("    Door(");
+            SerialUSB.print(pin);
+            SerialUSB.println(").setup: completed!");
             return true;
         } else {
+            SerialUSB.print("    Door(");
+            SerialUSB.print(pin);
+            SerialUSB.println(").setup: failed due to open door!");
             return false;
         }
     }

@@ -1,3 +1,5 @@
+#define DEBUG_MODE
+
 #include "InstantDx.h"
 
 // The Procedure class defines a state variable representing which step of the
@@ -14,12 +16,12 @@ class Procedure {
         load_lock = 5,
         start = 6,
         // run = 7,  // this step is in the flowchart but is decomposed
-        run_heater_1 = 700,   // this step is not in the flowchart
-        run_stepper_1 = 701,  // this step is not in the flowchart
-        run_stepper_2 = 702,  // this step is not in the flowchart
-        run_tickler = 703,    // this step is not in the flowchart
-        run_heater_2 = 704,   // this step is not in the flowchart
-        run_camera = 705,     // this step is not in the flowchart
+        run_heater_bottom = 700,  // this step is not in the flowchart
+        run_stepper_1 = 701,      // this step is not in the flowchart
+        run_stepper_2 = 702,      // this step is not in the flowchart
+        run_tickler = 703,        // this step is not in the flowchart
+        run_heater_top = 704,     // this step is not in the flowchart
+        run_camera = 705,         // this step is not in the flowchart
         report = 8,
         unload_open = 9,
         unload_clean = 10,
@@ -169,23 +171,35 @@ class Procedure {
 
 // Global constants
 
-static constexpr Procedure::HeatingParameters thermal_1_heating{
+static constexpr Procedure::HeatingParameters thermal_bottom_heating{
     95.0,            // deg C
     15 * 60 * 1000,  // ms
     3 * 60 * 1000    // ms
 };
-static constexpr Procedure::HeatingParameters thermal_2_heating{
+static constexpr Procedure::HeatingParameters thermal_top_heating{
     65.0,            // deg C
     15 * 60 * 1000,  // ms
-    40 * 60 * 1000   // ms
+#ifdef DEBUG_MODE
+    3 * 60 * 1000  // ms
+#else
+    40 * 60 * 1000                                  // ms
+#endif
 };
-static const unsigned int door_unlock_time = 1 * 1000;          // ms
-static const unsigned int tickler_duration = 20 * 1000;         // ms
-static constexpr float stepper_move_1_displacement = 32;        // mm
-static const uint8_t stepper_move_1_speed = 0.5;                // mm/s
+static const unsigned int door_unlock_time = 1 * 1000;    // ms
+static const unsigned int tickler_duration = 20 * 1000;   // ms
+static constexpr float stepper_move_1_displacement = 32;  // mm
+#ifdef DEBUG_MODE
+static constexpr float stepper_move_1_speed = 0;  // mm/s
+#else
+static constexpr float stepper_move_1_speed = 0.5;  // mm/s
+#endif
 static const unsigned long stepper_move_1_timeout = 30 * 1000;  // ms
-static const uint8_t stepper_move_2_velocity = 5;               // mm/s
-static const unsigned long stepper_move_2_timeout = 5 * 1000;   // ms
+#ifdef DEBUG_MODE
+static const uint8_t stepper_move_2_velocity = 0;  // mm/s
+#else
+static const uint8_t stepper_move_2_velocity = 5;   // mm/s
+#endif
+static const unsigned long stepper_move_2_timeout = 5 * 1000;  // ms
 
 // Global variables
 
@@ -205,7 +219,7 @@ void setup() {
     while (!SerialUSB) {
         ;  // wait for serial port to connect; needed for native USB port
     }
-    SerialUSB.println("DEBUG CONSOLE");
+    SerialUSB.println("InstantDx Debug Log");
 }
 
 // Each time loop is called, it checks the procedure object to determine the
@@ -226,7 +240,9 @@ void loop() {
             procedure.go(Step::initialize);
             return;
         case Step::initialize:
+            SerialUSB.println("Step::initialize: Initializing...");
             if (instant_dx.await_initialize()) {
+                SerialUSB.println("Step::initialize: Completed!");
                 procedure.go(Step::standby);
                 return;
             }
@@ -243,8 +259,13 @@ void loop() {
             instant_dx.user_interface.label_buttons("New Test");
             instant_dx.await_press(instant_dx.user_interface.primary);
             SerialUSB.println("Step::standby: Cooling down...");
+#ifdef DEBUG_MODE
+            procedure.go_try_cooldown(
+                instant_dx, Step::load_insert, Step::load_insert);
+#else
             procedure.go_try_cooldown(
                 instant_dx, Step::load_insert, Step::maintenance);
+#endif
             return;
         case Step::load_insert:
             SerialUSB.println("Step::load_insert: Unlocking door...");
@@ -259,6 +280,7 @@ void loop() {
                 instant_dx, "Done", Step::load_lock, "Back", Step::load_insert);
             return;
         case Step::load_lock:
+            SerialUSB.println("Step::load_lock: Locking door...");
             procedure.go_try_lock(instant_dx, Step::start, Step::load_insert);
             return;
         case Step::start:
@@ -266,19 +288,21 @@ void loop() {
             procedure.go_on_button(
                 instant_dx,
                 "Start",
-                Step::run_heater_1,
+                Step::run_heater_bottom,
                 "Back",
                 Step::load_insert);
             return;
-        case Step::run_heater_1:
+        case Step::run_heater_bottom:
+            SerialUSB.println("Step::run_heater_bottom: Heating...");
             procedure.go_try_heat(
                 instant_dx,
-                instant_dx.thermal_controller_1,
-                thermal_1_heating,
+                instant_dx.thermal_controller_bottom,
+                thermal_bottom_heating,
                 Step::run_stepper_1,
                 Step::maintenance);
             return;
         case Step::run_stepper_1:
+            SerialUSB.println("Step::run_stepper_1: Moving...");
             procedure.go_try_move(
                 instant_dx,
                 stepper_move_1_displacement,
@@ -287,6 +311,7 @@ void loop() {
                 Step::run_stepper_2,
                 Step::maintenance);
         case Step::run_stepper_2:
+            SerialUSB.println("Step::run_stepper_2: Moving...");
             procedure.go_try_move(
                 instant_dx,
                 stepper_move_2_velocity,
@@ -294,20 +319,23 @@ void loop() {
                 Step::run_tickler,
                 Step::maintenance);
         case Step::run_tickler:
+            SerialUSB.println("Step::run_tickler: Tickling...");
             instant_dx.tickler.activate();
             instant_dx.await_sleep(tickler_duration);
             instant_dx.tickler.deactivate();
-            procedure.go(Step::run_heater_2);
+            procedure.go(Step::run_heater_top);
             return;
-        case Step::run_heater_2:
+        case Step::run_heater_top:
+            SerialUSB.println("Step::run_heater_top: Heating...");
             procedure.go_try_heat(
                 instant_dx,
-                instant_dx.thermal_controller_2,
-                thermal_2_heating,
+                instant_dx.thermal_controller_top,
+                thermal_top_heating,
                 Step::run_camera,
                 Step::maintenance);
             return;
         case Step::run_camera:
+            SerialUSB.println("Step::run_camera: Reading...");
             test_result = instant_dx.camera.read();
             procedure.go(Step::report);
             return;
@@ -326,10 +354,17 @@ void loop() {
             }
             instant_dx.user_interface.label_buttons("Ok");
             instant_dx.await_press(instant_dx.user_interface.primary);
+            SerialUSB.println("Step::report: Cooling down...");
+#ifdef DEBUG_MODE
+            procedure.go_try_cooldown(
+                instant_dx, Step::unload_open, Step::unload_open);
+#else
             procedure.go_try_cooldown(
                 instant_dx, Step::unload_open, Step::maintenance);
+#endif
             return;
         case Step::unload_open:
+            SerialUSB.println("Step::unload_open: Unlocking...");
             instant_dx.await_unlock(door_unlock_time);
             instant_dx.user_interface.print_message("Open and unload");
             procedure.go_on_button(
@@ -367,8 +402,8 @@ void loop() {
             procedure.go(Step::power_off);
             return;
         case Step::maintenance:
-            instant_dx.thermal_controller_1.stop_control();
-            instant_dx.thermal_controller_2.stop_control();
+            instant_dx.thermal_controller_bottom.stop_control();
+            instant_dx.thermal_controller_top.stop_control();
             instant_dx.user_interface.print_message(
                 "Hardware error. Switch off. Call for help.");
             procedure.go(Step::power_off);
